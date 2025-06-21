@@ -78,8 +78,8 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 
 	go func() {
-		logger.Debug("starting tunnel")
-		defer logger.Debug("ending tunnel")
+		logger.Info("starting tunnel")
+		defer logger.Info("ending tunnel")
 		startTunnel(ctx, cfg, logger)
 	}()
 
