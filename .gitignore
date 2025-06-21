@@ -32,3 +32,4 @@ go.work.sum
 .vscode/
 iapgo.yaml
 .golangci.yaml
+/executables
