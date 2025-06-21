@@ -79,16 +79,16 @@ func main() {
 
 	go func() {
 		logger.Info("starting tunnel")
-		defer logger.Info("ending tunnel")
 		startTunnel(ctx, cfg, logger)
+		logger.Info("ending tunnel")
+		cancel()
 	}()
 
 	if len(cfg.Exec) > 0 {
 		go func() {
 			logger.Debug("running command")
-			defer logger.Debug("ending command")
-
 			runCmd(ctx, cfg.Exec, logger)
+			logger.Debug("ending command")
 			cancel()
 		}()
 
@@ -119,15 +119,15 @@ func startTunnel(ctx context.Context, conf config.Config, logger *slog.Logger) {
 		listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", conf.LocalPort))
 		if err != nil {
 			logger.Error("failed to listen", "error", err)
-			abnormalExit()
+			return
 		}
 
 		manager := tunnel.NewTunnelManager(target, nil)
 
-		err = manager.Serve(context.Background(), listener)
+		err = manager.Serve(ctx, listener)
 		if err != nil {
 			logger.Error("failed to start tunnel", "error", err)
-			abnormalExit()
+			return
 		}
 	}()
 	<-ctx.Done()
