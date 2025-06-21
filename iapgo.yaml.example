@@ -1,0 +1,22 @@
+default:
+  project_id: my-gcp-project
+  zone: us-central1-a
+  instance: my-jumpbox
+  local_port: 1234
+  remote_port: 1433
+  remote_nic: nic0
+  exec:
+    - bash
+    - "-c"
+    - sqlcmd -S tcp:localhost,1234 -U fred -No -d mydb -Q 'SELECT * FROM mytable'
+example:
+  project_id: my-gcp-project
+  zone: us-central1-a
+  instance: my-jumpbox
+  local_port: 1111
+  remote_port: 1111
+  remote_nic: nic0
+  exec:
+    - bash
+    - "-c"
+    - command and arguments
