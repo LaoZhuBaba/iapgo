@@ -1,13 +1,14 @@
 package config
 
 type Config struct {
-	ProjectID  string   `yaml:"project_id"`
-	Zone       string   `yaml:"zone"`
-	Instance   string   `yaml:"instance"`
-	RemotePort int      `yaml:"remote_port"`
-	LocalPort  int      `yaml:"local_port"`
-	RemoteNic  string   `yaml:"remote_nic"`
-	Exec       []string `yaml:"exec,omitempty"`
+	ProjectID   string   `yaml:"project_id"`
+	Zone        string   `yaml:"zone"`
+	Instance    string   `yaml:"instance"`
+	RemotePort  int      `yaml:"remote_port"`
+	LocalPort   int      `yaml:"local_port"`
+	RemoteNic   string   `yaml:"remote_nic"`
+	Exec        []string `yaml:"exec,omitempty"`
+	SshTunnelTo string   `yaml:"ssh_tunnel_to,omitempty"`
 }
 
 const ExampleConfig = `
