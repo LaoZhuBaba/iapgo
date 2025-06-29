@@ -106,20 +106,26 @@ func main() {
 		return
 	}
 
+	// SSH tunnelling is optional
 	if cfg.SshTunnelTo != "" {
 		startSshTunnel(ctx, cfg, port, logger, errCh)
 	}
 
+	// The Exec option is optional
 	if len(cfg.Exec) > 0 {
 		go func() {
 			logger.Debug("running command")
-			runCmd(ctx, cfg.Exec, logger, errCh)
+			runCmd(ctx, cfg.Exec, cfg.LocalPort, logger, errCh)
 			logger.Debug("command ended so cancelling context")
 			cancel()
 		}()
 
+	} else {
+		logger.Info("tunnel start.  Ctrl-C to exit")
 	}
 
+	// If the Exec option is enabled then the context will be cancelled after runCmd() completes.  If Exec
+	// is not enabled then the tunnel will stay open until an error occurs or context cancellation.
 	select {
 	case err, ok := <-errCh:
 		if !ok {
@@ -134,7 +140,10 @@ func main() {
 	}
 }
 
-func runCmd(ctx context.Context, args []string, logger *slog.Logger, errCh chan<- error) {
+func runCmd(ctx context.Context, args []string, port int, logger *slog.Logger, errCh chan<- error) {
+	// Run the provided command.  To avoid having to enter the local port number into the configuration file twice
+	// make it available as an env var.  This will only work if exec runs a shell.  E.g., "bash -c ..."
+	os.Setenv("IAPGO_LISTEN_PORT", fmt.Sprintf("%d", port))
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
@@ -146,7 +155,6 @@ func runCmd(ctx context.Context, args []string, logger *slog.Logger, errCh chan<
 }
 
 func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, logger *slog.Logger, errCh chan error) {
-	logger.Info("top of startSshTunnel", "destPort", destPort)
 	key, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".ssh", "google_compute_engine"))
 	if err != nil {
 		logger.Error("unable to read private key", "error", err)
@@ -174,7 +182,6 @@ func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, log
 		User: "adm_david_liebert_qoria_com",
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
-			//ssh.Password("ssh@test"),
 		},
 		HostKeyCallback:   hostKeyCallback,
 		HostKeyAlgorithms: algorithms.HostKeys,
@@ -185,26 +192,24 @@ func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, log
 	if err != nil {
 		logger.Error("Failed to dial SSH tunnel", "error", err)
 	}
-	logger.Debug("after starting ssh tunnel")
 
 	tunnelConn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(iapCfg.SshTunnelTo), Port: iapCfg.RemotePort})
 	if err != nil {
 		logger.Error("Failed to dial SSH tunnel", "error", err)
 	}
-	logger.Debug("after DialTCP")
 
 	l, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", iapCfg.LocalPort))
 	if err != nil {
 		logger.Error("Failed to listen", "error", err)
 	}
-	logger.Debug("after Listen", "addr", l.Addr().String())
+	logger.Debug("accepting connections")
 	go func() {
 		conn, err := l.Accept()
 		if err != nil {
 			logger.Error("Failed to accept SSH tunnel", "error", err)
 		}
 
-		logger.Debug("after Accept")
+		logger.Debug("copying local data into tunnel")
 		go func() {
 			_, err := io.Copy(tunnelConn, conn)
 			if err != nil {
@@ -212,6 +217,7 @@ func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, log
 			}
 		}()
 
+		logger.Debug("copying data from tunnel to local")
 		go func() {
 			_, err := io.Copy(conn, tunnelConn)
 			if err != nil {
@@ -219,7 +225,6 @@ func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, log
 			}
 		}()
 	}()
-	logger.Debug("after starting Copies")
 }
 
 func startIapTunnel(ctx context.Context, conf config.Config, logger *slog.Logger, portCh chan<- int, errCh chan<- error) {
@@ -250,7 +255,6 @@ func startIapTunnel(ctx context.Context, conf config.Config, logger *slog.Logger
 
 		manager := tunnel.NewTunnelManager(target, nil)
 
-		logger.Debug("starting IAP server", "port", listener.Addr().(*net.TCPAddr).Port)
 		err = manager.Serve(ctx, listener)
 		if err != nil {
 			logger.Error("failed to start tunnel", "error", err)
