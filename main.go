@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net"
 	"os"
@@ -79,9 +78,13 @@ func main() {
 
 	logger.Debug("config", "cfgMap[*configSectionPtr]", cfgMap[*configSectionPtr])
 
+	// Start the real work here
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
+	// portCh is needed when using SSH tunnelling because in that case IAP listens on an ephemeral local port
 	portCh := make(chan int)
+	// errChh is for reporting errors, must have a buffer of 1 to avoid a deadlock
 	errCh := make(chan error)
 	var port int
 
@@ -91,12 +94,13 @@ func main() {
 		logger.Info("IAP tunnel started")
 	}()
 
+	// Any error that occurs in startIapTunnel is fatal.  The expected path to receive a port
 	select {
-	case err := <-errCh:
-		logger.Error("tunnel exited with error", "error", err)
-		abnormalExit()
 	case port = <-portCh:
 		logger.Info("tunnel listening on port", "port", port)
+	case err := <-errCh:
+		logger.Error("tunnel exited with error", "error", err)
+		return
 	case <-ctx.Done():
 		logger.Info("context canceled while waiting for IAP tunnel startup", "error", ctx.Err())
 		return
@@ -109,22 +113,35 @@ func main() {
 	if len(cfg.Exec) > 0 {
 		go func() {
 			logger.Debug("running command")
-			runCmd(ctx, cfg.Exec, logger)
-			logger.Debug("ending command")
+			runCmd(ctx, cfg.Exec, logger, errCh)
+			logger.Debug("command ended so cancelling context")
 			cancel()
 		}()
 
 	}
-	<-ctx.Done()
+
+	select {
+	case err, ok := <-errCh:
+		if !ok {
+			logger.Error("tunnel exited without error", "error", err)
+			return
+		}
+		logger.Error("tunnel exited with error", "error", err)
+		return
+	case <-ctx.Done():
+		logger.Info("exiting because context canceled")
+		return
+	}
 }
 
-func runCmd(ctx context.Context, args []string, logger *slog.Logger) {
+func runCmd(ctx context.Context, args []string, logger *slog.Logger, errCh chan<- error) {
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	err := cmd.Run()
 	if err != nil {
 		logger.Error("failed to run command", "error", err)
+		errCh <- err
 	}
 }
 
@@ -132,13 +149,17 @@ func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, log
 	logger.Info("top of startSshTunnel", "destPort", destPort)
 	key, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".ssh", "google_compute_engine"))
 	if err != nil {
-		log.Fatalf("unable to read private key: %v", err)
+		logger.Error("unable to read private key", "error", err)
+		errCh <- err
+		return
 	}
 
 	// Create the Signer for this private key.
 	signer, err := ssh.ParsePrivateKey(key)
 	if err != nil {
 		logger.Error("unable to parse private key", "error", err)
+		errCh <- err
+		return
 	}
 
 	hostKeyCallback := ssh.InsecureIgnoreHostKey()
@@ -186,12 +207,16 @@ func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, log
 		logger.Debug("after Accept")
 		go func() {
 			_, err := io.Copy(tunnelConn, conn)
-			errCh <- err
+			if err != nil {
+				errCh <- err
+			}
 		}()
 
 		go func() {
 			_, err := io.Copy(conn, tunnelConn)
-			errCh <- err
+			if err != nil {
+				errCh <- err
+			}
 		}()
 	}()
 	logger.Debug("after starting Copies")
