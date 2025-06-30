@@ -1,4 +1,4 @@
-package config
+package iapgo
 
 type Config struct {
 	ProjectID   string   `yaml:"project_id"`
