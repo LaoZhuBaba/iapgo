@@ -1,14 +1,20 @@
 package iapgo
 
 type Config struct {
-	ProjectID   string   `yaml:"project_id"`
-	Zone        string   `yaml:"zone"`
-	Instance    string   `yaml:"instance"`
-	RemotePort  int      `yaml:"remote_port"`
-	LocalPort   int      `yaml:"local_port"`
-	RemoteNic   string   `yaml:"remote_nic"`
-	Exec        []string `yaml:"exec,omitempty"`
-	SshTunnelTo string   `yaml:"ssh_tunnel_to,omitempty"`
+	ProjectID  string     `yaml:"project_id"`
+	Zone       string     `yaml:"zone"`
+	Instance   string     `yaml:"instance"`
+	RemotePort int        `yaml:"remote_port"`
+	LocalPort  int        `yaml:"local_port"`
+	RemoteNic  string     `yaml:"remote_nic"`
+	Exec       []string   `yaml:"exec,omitempty"`
+	SshTunnel  *SshTunnel `yaml:"ssh_tunnel,omitempty"`
+}
+
+type SshTunnel struct {
+	TunnelTo       string `yaml:"tunnel_to"`
+	KnownHostsFile string `yaml:"known_hosts_file,omitempty"`
+	AccountName    string `yaml:"account_name,omitempty"`
 }
 
 const ExampleConfig = `

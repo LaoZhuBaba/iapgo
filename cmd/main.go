@@ -71,21 +71,33 @@ func main() {
 		abnormalExit()
 	}
 
+	if cfg.SshTunnel != nil {
+		if cfg.SshTunnel.TunnelTo == "" {
+			logger.Error("if ssh_tunnel is configured then ssh_tunnel_to must have a value")
+			abnormalExit()
+		}
+	}
 	logger.Debug("config", "cfgMap[*configSectionPtr]", cfgMap[*configSectionPtr])
 
 	// Start the real work here
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	login, err := iapgo.GetGcpLogin()
-	if err != nil {
-		logger.Error("failed to get gcp login", "error", err)
-		logger.Error("this may be because the 'gcloud' command is not in your path or you are not logged into GCP")
-	}
+	var posixAccount string
 
-	posixAccount, err := iapgo.GetPosixLogin(ctx, login)
-	if err != nil {
-		logger.Error("failed to get posix login", "error", err)
+	if cfg.SshTunnel.AccountName != "" {
+		posixAccount = cfg.SshTunnel.AccountName
+	} else {
+		login, err := iapgo.GetGcpLogin()
+		if err != nil {
+			logger.Error("failed to get gcp login", "error", err)
+			logger.Error("this may be because the 'gcloud' command is not in your path or you are not logged into GCP")
+		}
+
+		posixAccount, err = iapgo.GetPosixLogin(ctx, login)
+		if err != nil {
+			logger.Error("failed to get posix login", "error", err)
+		}
 	}
 	fmt.Println("posix login:", posixAccount)
 
@@ -114,8 +126,12 @@ func main() {
 	}
 
 	// SSH tunnelling is optional
-	if cfg.SshTunnelTo != "" {
-		iapgo.StartSshTunnel(ctx, cfg, posixAccount, port, logger, errCh)
+	if cfg.SshTunnel != nil {
+		err = iapgo.StartSshTunnel(ctx, cfg, posixAccount, port, logger, errCh)
+		if err != nil {
+			logger.Error("failed to start ssh tunnel", "error", err)
+			return
+		}
 	}
 
 	// The Exec option is optional

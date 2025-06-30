@@ -20,7 +20,7 @@ func StartIapTunnel(ctx context.Context, conf Config, logger *slog.Logger, portC
 			Port:      conf.RemotePort,
 			Interface: conf.RemoteNic,
 		}
-		if conf.SshTunnelTo == "" {
+		if conf.SshTunnel == nil {
 			target.Port = conf.RemotePort
 		} else {
 			logger.Debug("connecting IAP tunnel to TCP port 22")

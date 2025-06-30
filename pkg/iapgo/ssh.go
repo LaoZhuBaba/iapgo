@@ -2,6 +2,7 @@ package iapgo
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,28 +11,40 @@ import (
 	"path/filepath"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
-func StartSshTunnel(ctx context.Context, iapCfg Config, posixAccount string, destPort int, logger *slog.Logger, errCh chan error) {
+func StartSshTunnel(ctx context.Context, iapCfg Config, posixAccount string, destPort int, logger *slog.Logger, errCh chan error) error {
 	key, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".ssh", "google_compute_engine"))
 	if err != nil {
-		logger.Error("unable to read private key", "error", err)
-		errCh <- err
-		return
+		return err
 	}
 
 	// Create the Signer for this private key.
 	signer, err := ssh.ParsePrivateKey(key)
 	if err != nil {
-		logger.Error("unable to parse private key", "error", err)
-		errCh <- err
-		return
+		return err
 	}
 
-	// This disables normal checking to ensure that the host you are connecting matches the host recorded
-	// in known_hosts.  But in our case we are connecting via an IAP tunnel so the host is already trusted.
-	hostKeyCallback := ssh.InsecureIgnoreHostKey()
+	var hostKeyCallback ssh.HostKeyCallback
 
+	if iapCfg.SshTunnel.KnownHostsFile != "" {
+		hostKeyCallback, err = knownhosts.New(iapCfg.SshTunnel.KnownHostsFile)
+		if err != nil {
+			logger.Error("failed to load known hosts file", "error", err)
+			return err
+		}
+	} else {
+		// This disables normal checking to ensure that the host you are connecting matches the host recorded
+		// in known_hosts.  But in our case we are connecting via an IAP tunnel so the host is already trusted.
+		hostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			logger.Info("known hosts file", "hostname", hostname)
+			logger.Info("known hosts file", "remote", remote)
+			logger.Info("known hosts file", "type", key.Type())
+			logger.Info("known hosts file", "key", base64.StdEncoding.EncodeToString(key.Marshal()))
+			return nil
+		}
+	}
 	algorithms := ssh.SupportedAlgorithms()
 	cfg := &ssh.ClientConfig{
 		Config: ssh.Config{
@@ -50,23 +63,24 @@ func StartSshTunnel(ctx context.Context, iapCfg Config, posixAccount string, des
 	logger.Debug("starting ssh tunnel", "destPort", destPort)
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", "localhost", destPort), cfg)
 	if err != nil {
-		logger.Error("Failed to dial SSH tunnel", "error", err)
+		return err
 	}
 
-	tunnelConn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(iapCfg.SshTunnelTo), Port: iapCfg.RemotePort})
+	tunnelConn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(iapCfg.SshTunnel.TunnelTo), Port: iapCfg.RemotePort})
 	if err != nil {
-		logger.Error("Failed to dial SSH tunnel", "error", err)
+		return err
 	}
 
 	l, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", iapCfg.LocalPort))
 	if err != nil {
-		logger.Error("Failed to listen", "error", err)
+		return err
 	}
 	logger.Debug("accepting connections")
 	go func() {
 		conn, err := l.Accept()
 		if err != nil {
 			logger.Error("Failed to accept SSH tunnel", "error", err)
+			errCh <- err
 		}
 
 		logger.Debug("copying local data into tunnel")
@@ -85,4 +99,5 @@ func StartSshTunnel(ctx context.Context, iapCfg Config, posixAccount string, des
 			}
 		}()
 	}()
+	return nil
 }
