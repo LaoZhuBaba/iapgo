@@ -1,9 +1,16 @@
 package main
 
 import (
+	oslogin "cloud.google.com/go/oslogin/apiv1"
+	osloginpb "cloud.google.com/go/oslogin/apiv1/osloginpb"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	config "github.com/LaoZhuBaba/iapgo/config"
+	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
+	"golang.org/x/crypto/ssh"
+	yaml "gopkg.in/yaml.v3"
 	"io"
 	"log/slog"
 	"net"
@@ -11,11 +18,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-
-	config "github.com/LaoZhuBaba/iapgo/config"
-	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
-	"golang.org/x/crypto/ssh"
-	yaml "gopkg.in/yaml.v3"
+	"strings"
 )
 
 const (
@@ -26,6 +29,36 @@ const (
 func abnormalExit() {
 	flag.Usage()
 	os.Exit(1)
+}
+
+func getPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
+
+	osloginClient, err := oslogin.NewClient(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer osloginClient.Close()
+
+	oslp, err := osloginClient.GetLoginProfile(ctx, &osloginpb.GetLoginProfileRequest{Name: fmt.Sprintf("users/%s", gcpLogin)})
+	if err != nil {
+		return "", err
+	}
+
+	for _, ac := range oslp.PosixAccounts {
+		if ac.Primary {
+			return ac.Username, nil
+		}
+	}
+	return "", errors.New("no primary posix command could be found")
+}
+
+func getGcpLogin() (string, error) {
+	cmd := exec.Command("bash", "-c", "gcloud config get account")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 func main() {
@@ -82,6 +115,18 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	login, err := getGcpLogin()
+	if err != nil {
+		logger.Error("failed to get gcp login", "error", err)
+		logger.Error("this may be because the 'gcloud' command is not in your path or you are not logged into GCP")
+	}
+
+	posixAccount, err := getPosixLogin(ctx, login)
+	if err != nil {
+		logger.Error("failed to get posix login", "error", err)
+	}
+	fmt.Println("posix login:", posixAccount)
+
 	// portCh is needed when using SSH tunnelling because in that case IAP listens on an ephemeral local port
 	portCh := make(chan int)
 	// errChh is for reporting errors, must have a buffer of 1 to avoid a deadlock
@@ -108,7 +153,7 @@ func main() {
 
 	// SSH tunnelling is optional
 	if cfg.SshTunnelTo != "" {
-		startSshTunnel(ctx, cfg, port, logger, errCh)
+		startSshTunnel(ctx, cfg, posixAccount, port, logger, errCh)
 	}
 
 	// The Exec option is optional
@@ -154,7 +199,7 @@ func runCmd(ctx context.Context, args []string, port int, logger *slog.Logger, e
 	}
 }
 
-func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, logger *slog.Logger, errCh chan error) {
+func startSshTunnel(ctx context.Context, iapCfg config.Config, posixAccount string, destPort int, logger *slog.Logger, errCh chan error) {
 	key, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".ssh", "google_compute_engine"))
 	if err != nil {
 		logger.Error("unable to read private key", "error", err)
@@ -170,6 +215,8 @@ func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, log
 		return
 	}
 
+	// This disables normal checking to ensure that the host you are connecting matches the host recorded
+	// in known_hosts.  But in our case we are connecting via an IAP tunnel so the host is already trusted.
 	hostKeyCallback := ssh.InsecureIgnoreHostKey()
 
 	algorithms := ssh.SupportedAlgorithms()
@@ -179,7 +226,7 @@ func startSshTunnel(ctx context.Context, iapCfg config.Config, destPort int, log
 			Ciphers:      algorithms.Ciphers,
 			MACs:         algorithms.MACs,
 		},
-		User: "adm_david_liebert_qoria_com",
+		User: posixAccount,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
