@@ -10,7 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 
-	config "github.com/LaoZhuBaba/iapgo/config"
+	config "github.com/LaoZhuBaba/iapgo/v1/config"
 	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
 	yaml "gopkg.in/yaml.v3"
 )
