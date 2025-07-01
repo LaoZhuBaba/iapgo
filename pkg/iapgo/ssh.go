@@ -2,7 +2,6 @@ package iapgo
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,7 +10,6 @@ import (
 	"path/filepath"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 func StartSshTunnel(ctx context.Context, iapCfg Config, posixAccount string, destPort int, logger *slog.Logger, errCh chan error) error {
@@ -26,25 +24,10 @@ func StartSshTunnel(ctx context.Context, iapCfg Config, posixAccount string, des
 		return err
 	}
 
-	var hostKeyCallback ssh.HostKeyCallback
+	// This disables normal checking to ensure that the host you are connecting matches the host recorded
+	// in known_hosts.  But in our case we are connecting via an IAP tunnel so the host is already trusted.
+	hostKeyCallback := ssh.InsecureIgnoreHostKey()
 
-	if iapCfg.SshTunnel.KnownHostsFile != "" {
-		hostKeyCallback, err = knownhosts.New(iapCfg.SshTunnel.KnownHostsFile)
-		if err != nil {
-			logger.Error("failed to load known hosts file", "error", err)
-			return err
-		}
-	} else {
-		// This disables normal checking to ensure that the host you are connecting matches the host recorded
-		// in known_hosts.  But in our case we are connecting via an IAP tunnel so the host is already trusted.
-		hostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			logger.Info("known hosts file", "hostname", hostname)
-			logger.Info("known hosts file", "remote", remote)
-			logger.Info("known hosts file", "type", key.Type())
-			logger.Info("known hosts file", "key", base64.StdEncoding.EncodeToString(key.Marshal()))
-			return nil
-		}
-	}
 	algorithms := ssh.SupportedAlgorithms()
 	cfg := &ssh.ClientConfig{
 		Config: ssh.Config{
