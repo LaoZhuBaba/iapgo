@@ -2,21 +2,26 @@ default:
   project_id: my-gcp-project
   zone: us-central1-a
   instance: my-jumpbox
-  local_port: 1234
-  remote_port: 1433
+  # If local_port is not set then an ephemeral port will be allocated and made available as $IAP_LISTEN_PORT
+  # local_port: 1234
+  remote_port: 80
   remote_nic: nic0
   exec:
     - bash
     - "-c"
-    - sqlcmd -S tcp:localhost,1234 -U fred -No -d mydb -Q 'SELECT * FROM mytable'
+    - curl http://localhost:$IAP_LISTEN_PORT
 example:
   project_id: my-gcp-project
   zone: us-central1-a
   instance: my-jumpbox
-  local_port: 1111
-  remote_port: 1111
+  remote_port: 80 # When ssh_tunnel is used then this is the port on the tunnel_to hosts
   remote_nic: nic0
+  ssh_tunnel:
+    tunnel_to: 1.2.3.4 # This is a host that is reachable from my-jumpbox
+    # If account_name is not set then an attempt will be made to get value from os-login
+    # account_name: my_ssh_login
   exec:
     - bash
     - "-c"
-    - command and arguments
+    # curl will reach ssh_tunnel.tunnel_to host on remote_port
+    - curl http://localhost:$IAP_LISTEN_PORT

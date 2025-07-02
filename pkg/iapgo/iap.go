@@ -2,48 +2,40 @@ package iapgo
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net"
 
 	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
 )
 
-func StartIapTunnel(ctx context.Context, conf Config, logger *slog.Logger, portCh chan<- int, errCh chan<- error) {
-	localPort := conf.LocalPort
+func StartIapTunnel(ctx context.Context, listener net.Listener,
+	conf Config, logger *slog.Logger) *tunnel.TunnelManager {
+
+	target := tunnel.TunnelTarget{
+		Project:   conf.ProjectID,
+		Zone:      conf.Zone,
+		Instance:  conf.Instance,
+		Port:      conf.RemotePort,
+		Interface: conf.RemoteNic,
+	}
+
+	// If we SSH Tunnelling is used then the target port is always 22
+	if conf.SshTunnel != nil {
+		target.Port = 22
+	}
+
+	logger.Debug("starting IAP Tunnel Manager", "remote port", target.Port)
+	tm := tunnel.NewTunnelManager(target, nil)
 
 	go func() {
-		target := tunnel.TunnelTarget{
-			Project:   conf.ProjectID,
-			Zone:      conf.Zone,
-			Instance:  conf.Instance,
-			Port:      conf.RemotePort,
-			Interface: conf.RemoteNic,
-		}
-		if conf.SshTunnel == nil {
-			target.Port = conf.RemotePort
-		} else {
-			logger.Debug("connecting IAP tunnel to TCP port 22")
-			target.Port = 22
-			localPort = 0
-		}
-
-		listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", localPort))
+		logger.Debug("tm.Serve() starting to wait for connection on port", "port", listener.Addr().(*net.TCPAddr).Port)
+		err := tm.Serve(ctx, listener)
 		if err != nil {
-			errCh <- err
+			logger.Error("tm.Serve() failed", "err", err)
 			return
 		}
-		portCh <- listener.Addr().(*net.TCPAddr).Port
-
-		manager := tunnel.NewTunnelManager(target, nil)
-
-		err = manager.Serve(ctx, listener)
-		if err != nil {
-			logger.Error("failed to start tunnel", "error", err)
-			return
-		}
-		logger.Debug("after starting IAP server", "port", listener.Addr().(*net.TCPAddr).Port)
-
+		logger.Debug("tm.Serve() exited normally")
 	}()
-	//<-ctx.Done()
+
+	return tm
 }

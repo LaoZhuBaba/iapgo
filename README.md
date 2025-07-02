@@ -1,4 +1,6 @@
 # iapgo
+## This is a Work In Progress
+
 ### A configuration wrapper for launching Google Identity Aware Proxy (IAP) tunnels, either with or without a secondary SSH tunnel
 
 Use this tool to create either a simple IAP tunnel to a port on a jump
@@ -92,7 +94,7 @@ example:
   ssh_tunnel:
     tunnel_to: 1.2.3.4 # This is a host that is reachable from my-jumpbox
     # If account_name is not set then an attempt will be made to get value from os-login
-    # account_name: adm_david_liebert_qoria_com
+    # account_name: my_ssh_login
   exec:
     - bash
     - "-c"

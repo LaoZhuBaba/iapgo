@@ -3,25 +3,43 @@ package iapgo
 import (
 	"context"
 	"fmt"
-	"io"
+	"golang.org/x/crypto/ssh"
 	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
-
-	"golang.org/x/crypto/ssh"
 )
 
-func StartSshTunnel(ctx context.Context, iapCfg Config, posixAccount string, destPort int, logger *slog.Logger, errCh chan error) error {
-	key, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".ssh", "google_compute_engine"))
-	if err != nil {
-		return err
+func StartSshTunnel(ctx context.Context, client *ssh.Client, destAddr string, destPort int) (net.Conn, error) {
+	return client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(destAddr), Port: destPort})
+}
+
+func CreateSshClient(
+	ctx context.Context,
+	iapCfg Config,
+	posixAccount string,
+	destPort int,
+	logger *slog.Logger,
+) (*ssh.Client, error) {
+	var pkFile string
+
+	if iapCfg.SshTunnel.PrivateKeyFile == "" {
+		pkFile = filepath.Join(os.Getenv("HOME"), ".ssh", "google_compute_engine")
+	} else {
+		pkFile = iapCfg.SshTunnel.PrivateKeyFile
 	}
 
-	// Create the Signer for this private key.
-	signer, err := ssh.ParsePrivateKey(key)
+	logger.Debug("private key path", "pkFile", pkFile)
+
+	privateKey, err := os.ReadFile(pkFile)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	// Create the Signer for this private private key.
+	signer, err := ssh.ParsePrivateKey(privateKey)
+	if err != nil {
+		return nil, err
 	}
 
 	// This disables normal checking to ensure that the host you are connecting matches the host recorded
@@ -46,41 +64,7 @@ func StartSshTunnel(ctx context.Context, iapCfg Config, posixAccount string, des
 	logger.Debug("starting ssh tunnel", "destPort", destPort)
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", "localhost", destPort), cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	tunnelConn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(iapCfg.SshTunnel.TunnelTo), Port: iapCfg.RemotePort})
-	if err != nil {
-		return err
-	}
-
-	l, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", iapCfg.LocalPort))
-	if err != nil {
-		return err
-	}
-	logger.Debug("accepting connections")
-	go func() {
-		conn, err := l.Accept()
-		if err != nil {
-			logger.Error("Failed to accept SSH tunnel", "error", err)
-			errCh <- err
-		}
-
-		logger.Debug("copying local data into tunnel")
-		go func() {
-			_, err := io.Copy(tunnelConn, conn)
-			if err != nil {
-				errCh <- err
-			}
-		}()
-
-		logger.Debug("copying data from tunnel to local")
-		go func() {
-			_, err := io.Copy(conn, tunnelConn)
-			if err != nil {
-				errCh <- err
-			}
-		}()
-	}()
-	return nil
+	return client, err
 }
