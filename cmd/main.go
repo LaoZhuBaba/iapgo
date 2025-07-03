@@ -67,6 +67,8 @@ func main() {
 	// use a random ephemeral port.  If SSH tunnelling is not being used then localIapPort should be set
 	// to the value of cfg.LocalPort (which will also be zero if value is not configured).
 	var localIapPort int
+	var sshLsnrAddr *net.TCPAddr
+	var portForRunCmd int
 
 	if cfg.SshTunnel == nil {
 		localIapPort = cfg.LocalPort
@@ -85,14 +87,14 @@ func main() {
 		_ = iapLsnr.Close()
 	}()
 
-	iapLsnrPort, ok := iapLsnr.Addr().(*net.TCPAddr)
+	iapLsnrAddr, ok := iapLsnr.Addr().(*net.TCPAddr)
 	if !ok {
 		logger.Error("iapLsnr is not listening on a TCP port")
 
 		return
 	}
 
-	logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort.Port)
+	logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrAddr.Port)
 
 	tunnelMgr := iapgo.StartIapTunnel(ctx, iapLsnr, *cfg, logger)
 
@@ -116,7 +118,7 @@ func main() {
 			ctx,
 			*cfg,
 			cfg.SshTunnel.AccountName,
-			iapLsnrPort.Port,
+			iapLsnrAddr.Port,
 			logger,
 		)
 		if err != nil {
@@ -132,6 +134,14 @@ func main() {
 			logger.Error("failed to listen (sshLsnr)", "error", err)
 			return
 		}
+
+		sshLsnrAddr, ok = sshLsnr.Addr().(*net.TCPAddr)
+		if !ok {
+			logger.Error("sshLsnr is not listening on a TCP port")
+			return
+		}
+
+		logger.Debug("sshLsnrAddrr is listening on TCP port", "port", sshLsnrAddr.Port)
 
 		defer func() {
 			logger.Debug("closing SSH listener")
@@ -196,5 +206,11 @@ func main() {
 		<-ctx.Done()
 	}
 
-	iapgo.RunCmd(ctx, cfg.Exec, cfg.LocalPort, logger)
+	if cfg.SshTunnel == nil {
+		portForRunCmd = iapLsnrAddr.Port
+	} else {
+		portForRunCmd = sshLsnrAddr.Port
+	}
+
+	iapgo.RunCmd(ctx, cfg.Exec, portForRunCmd, logger)
 }
