@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net"
 	"os/exec"
 	"strings"
 
@@ -47,4 +49,14 @@ func GetGcpLogin() (string, error) {
 	}
 
 	return strings.TrimSpace(string(out)), nil
+}
+
+func GetPortFromTcpAddr(addr net.Listener, logger *slog.Logger) (int, error) {
+
+	tcpAddr, ok := addr.Addr().(*net.TCPAddr)
+	if !ok {
+		return 0, fmt.Errorf("not a TCP listener")
+	}
+
+	return tcpAddr.Port, nil
 }
