@@ -2,8 +2,10 @@ package iapgo
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
+	"time"
 
 	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
 )
@@ -42,4 +44,29 @@ func StartIapTunnel(ctx context.Context, listener net.Listener,
 	}()
 
 	return tunnelManager
+}
+
+func StartIapTunnelMgr(ctx context.Context, iapLsnr net.Listener, cfg *Config, logger *slog.Logger) (*tunnel.TunnelManager, error) {
+	tunnelMgr := StartIapTunnel(ctx, iapLsnr, *cfg, logger)
+
+	iapLsnrPort, err := GetPortFromTcpAddr(iapLsnr, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get port from IAP listener: %w", err)
+	}
+
+	logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
+
+	select {
+	case <-time.After(1 * time.Second):
+		return nil, fmt.Errorf("timed out waiting for the IAP tunnel to be ready")
+
+	case err := <-tunnelMgr.Errors():
+		return nil, fmt.Errorf("IAP tunnel returned an error: %w", err)
+
+	case <-tunnelMgr.Ready():
+		logger.Info("IAP tunnel is ready")
+
+		break
+	}
+	return tunnelMgr, nil
 }

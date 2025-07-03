@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"time"
 
 	"github.com/LaoZhuBaba/iapgo/pkg/iapgo"
 )
@@ -98,23 +97,13 @@ func main() {
 
 	logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
 
-	tunnelMgr := iapgo.StartIapTunnel(ctx, iapLsnr, *cfg, logger)
-
-	select {
-	case <-time.After(1 * time.Second):
-		logger.Warn("timed out waiting for the IAP tunnel to be ready")
-
+	tunnelMgr, err := iapgo.StartIapTunnelMgr(ctx, iapLsnr, cfg, logger)
+	if err != nil {
+		logger.Error("failed to start tunnel manager", "error", err)
 		return
-	case err := <-tunnelMgr.Errors():
-		logger.Error("IAP tunnel returned an error", "error", err)
-
-		return
-	case <-tunnelMgr.Ready():
-		logger.Info("IAP tunnel is ready")
-
-		break
 	}
 
+	// Pick up any errors from tunnelMgr and log them.  Not much else we can do.
 	go func() {
 		err := <-tunnelMgr.Errors()
 		logger.Error("iap tunnel manager returned an error", "error", err)
@@ -136,6 +125,7 @@ func main() {
 	if cfg.Exec == nil {
 		logger.Debug("no Exec command so wait forever.  Enter Control-C to exit")
 		<-ctx.Done()
+		return
 	}
 
 	if cfg.SshTunnel == nil {
