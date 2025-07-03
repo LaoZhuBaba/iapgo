@@ -25,32 +25,38 @@ type SshTunnel struct {
 	PrivateKeyFile string `yaml:"private_key_file,omitempty"`
 }
 
+// This is printed out as part of the "usage" output
 const ExampleConfig = `
-	default:
-	  project_id: my-gcp-project
-	  zone: us-central1-a
-	  instance: my-jumpbox
-	  local_port: 1234
-	  remote_port: 2345
-	  remote_nic: nic0
-	  exec:
-		- bash
-		- "-c"
-		- my-command
-	  ssh_tunnel:
-		tunnel_to: 1.2.3.4
-		private_key_file: /home/fred/.ssh/rsa_key
-	example:
-	  project_id: my-gcp-project
-	  zone: us-central1-a
-	  instance: my-jumpbox
-	  local_port: 1111
-	  remote_port: 1111
-	  remote_nic: nic0
-	  exec:
-		- bash
-		- "-c"
-		- my-command
+# default will be used if no config section is specified
+default:
+  project_id: my-gcp-project
+  zone: us-central1-a
+  instance: my-jumpbox
+  # If local_port is not set then an ephemeral port will be allocated and made available as $IAP_LISTEN_PORT
+  # local_port: 1234
+  remote_port: 80
+  remote_nic: nic0
+  exec:
+    - bash
+    - "-c"
+    - curl http://localhost:$IAP_LISTEN_PORT
+example:
+  project_id: my-gcp-project
+  zone: us-central1-a
+  instance: my-jumpbox
+  remote_port: 80 # When ssh_tunnel is used then this is the port on the tunnel_to hosts
+  remote_nic: nic0
+  ssh_tunnel:
+    tunnel_to: 1.2.3.4 # This is a host that is reachable from my-jumpbox
+    # If account_name is not set then an attempt will be made to get value from os-login
+    # account_name: my_ssh_login
+    # By default ~/.ssh/google_compute_engine will be used.
+    # private_key_file: /home/fred/.ssh/google_compute_engine
+  exec:
+    - bash
+    - "-c"
+    # curl will reach ssh_tunnel.tunnel_to host on remote_port
+    - curl http://localhost:$IAP_LISTEN_PORT
 `
 
 func GetConfig(ctx context.Context, yamlFileName string, cfgSection string, logger *slog.Logger) (*Config, error) {
