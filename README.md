@@ -3,6 +3,8 @@
 
 ### A configuration wrapper for launching Google Identity Aware Proxy (IAP) tunnels, either with or without a secondary SSH tunnel
 
+![Example Use for Cloud DB Management](iap.drawio.png)
+
 Use this tool to create either a simple IAP tunnel to a port on a jump
 box that is reachable via SSH or create a secondary SSH tunnel within the
 IAP tunnel to reach an host that is reachable from the jump box.
