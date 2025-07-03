@@ -73,6 +73,7 @@ iapgo [-c config_section] [-f config_file_name] [-v]
 
 Example configuration file:
 ```
+# default will be used if no config section is specified
 default:
   project_id: my-gcp-project
   zone: us-central1-a
@@ -95,6 +96,8 @@ example:
     tunnel_to: 1.2.3.4 # This is a host that is reachable from my-jumpbox
     # If account_name is not set then an attempt will be made to get value from os-login
     # account_name: my_ssh_login
+    # By default ~/.ssh/google_compute_engine will be used.
+    # private_key_file: /home/fred/.ssh/google_compute_engine
   exec:
     - bash
     - "-c"
