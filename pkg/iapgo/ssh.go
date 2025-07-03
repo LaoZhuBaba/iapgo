@@ -18,8 +18,10 @@ func StartSshTunnel(
 	destPort int,
 ) (net.Conn, error) {
 	conn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(destAddr), Port: destPort})
-
-	return conn, fmt.Errorf("error starting ssh tunnel: %w", err)
+	if err != nil {
+		return conn, fmt.Errorf("error starting ssh tunnel: %w", err)
+	}
+	return conn, nil
 }
 
 func CreateSshClient(
