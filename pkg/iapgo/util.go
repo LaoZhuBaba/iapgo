@@ -12,31 +12,39 @@ import (
 )
 
 func GetPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
-
 	osloginClient, err := oslogin.NewClient(ctx)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error getting oslogin client: %w", err)
 	}
-	defer osloginClient.Close()
+	defer func() {
+		_ = osloginClient.Close()
+	}()
 
-	oslp, err := osloginClient.GetLoginProfile(ctx, &osloginpb.GetLoginProfileRequest{Name: fmt.Sprintf("users/%s", gcpLogin)})
+	oslp, err := osloginClient.GetLoginProfile(
+		ctx,
+		&osloginpb.GetLoginProfileRequest{Name: fmt.Sprintf("users/%s", gcpLogin)},
+	)
+
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error getting login profile: %w", err)
 	}
 
-	for _, ac := range oslp.PosixAccounts {
-		if ac.Primary {
-			return ac.Username, nil
+	for _, ac := range oslp.GetPosixAccounts() {
+		if ac.GetPrimary() {
+			return ac.GetUsername(), nil
 		}
 	}
+
 	return "", errors.New("no primary posix command could be found")
 }
 
 func GetGcpLogin() (string, error) {
 	cmd := exec.Command("bash", "-c", "gcloud config get account")
 	out, err := cmd.Output()
+
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error getting gcp login: %w", err)
 	}
+
 	return strings.TrimSpace(string(out)), nil
 }
