@@ -2,6 +2,8 @@ package iapgo
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -25,7 +27,7 @@ type SshTunnel struct {
 	PrivateKeyFile string `yaml:"private_key_file,omitempty"`
 }
 
-// This is printed out as part of the "usage" output
+// This is printed out as part of the "usage" output.
 const ExampleConfig = `
 # default will be used if no config section is specified
 default:
@@ -59,55 +61,68 @@ example:
     - curl http://localhost:$IAP_LISTEN_PORT
 `
 
-func GetConfig(ctx context.Context, yamlFileName string, cfgSection string, logger *slog.Logger) (*Config, error) {
+func GetConfig(
+	ctx context.Context,
+	yamlFileName string,
+	cfgSection string,
+	logger *slog.Logger,
+) (*Config, error) {
 	var cfgMap map[string]Config
 
 	yamlFile, err := os.ReadFile(yamlFileName)
 	if err != nil {
-		logger.Error("failed to read YAML file with error", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to read YAML file with error: %w", err)
 	}
 
 	err = yaml.Unmarshal(yamlFile, &cfgMap)
 	if err != nil {
-		logger.Error("Error unmarshalling YAML", "error", err)
-		return nil, err
+		return nil, fmt.Errorf("error unmarshalling YAML: %w", err)
 	}
+
 	cfg, ok := cfgMap[cfgSection]
+
 	if !ok {
-		logger.Error("config section does not exist", "*configSectionPtr", cfgSection)
-		return nil, err
+		return nil, fmt.Errorf("config section does not exist: %s", cfgSection)
 	}
 
 	if cfg.SshTunnel != nil {
 		if cfg.SshTunnel.TunnelTo == "" {
-			logger.Error("if ssh_tunnel is configured then ssh_tunnel_to must have a value")
-			return nil, err
+			return nil, errors.New("if ssh_tunnel is configured then ssh_tunnel_to must have a value")
 		}
 	}
 
 	if cfg.SshTunnel != nil {
 		if cfg.SshTunnel.TunnelTo == "" {
-			logger.Error("if ssh_tunnel is configured then ssh_tunnel_to must have a value")
-			return nil, err
+			return nil, errors.New("if ssh_tunnel is configured then ssh_tunnel_to must have a value")
 		}
 	}
 
 	if cfg.SshTunnel != nil && cfg.SshTunnel.AccountName == "" {
 		logger.Debug("no posix account name found in config so attempting to resolve from OS Login")
+
 		login, err := GetGcpLogin()
+
 		if err != nil {
 			logger.Error("failed to get gcp login", "error", err)
-			logger.Error("this may be because the 'gcloud' command is not in your path or you are not logged into GCP")
+			logger.Error(
+				"this may be because the 'gcloud' command is not in your path or you are not logged into GCP",
+			)
+
 			return nil, err
 		}
 
 		cfg.SshTunnel.AccountName, err = GetPosixLogin(ctx, login)
 		if err != nil {
 			logger.Error("failed to get posix login", "error", err)
+
 			return nil, err
 		}
-		logger.Debug("successfully resolved from OS Login", "AccountName", cfg.SshTunnel.AccountName)
+
+		logger.Debug(
+			"successfully resolved from OS Login",
+			"AccountName",
+			cfg.SshTunnel.AccountName,
+		)
 	}
 
 	return &cfg, nil

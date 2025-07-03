@@ -9,8 +9,8 @@ import (
 )
 
 func StartIapTunnel(ctx context.Context, listener net.Listener,
-	conf Config, logger *slog.Logger) *tunnel.TunnelManager {
-
+	conf Config, logger *slog.Logger,
+) *tunnel.TunnelManager {
 	target := tunnel.TunnelTarget{
 		Project:   conf.ProjectID,
 		Zone:      conf.Zone,
@@ -19,23 +19,27 @@ func StartIapTunnel(ctx context.Context, listener net.Listener,
 		Interface: conf.RemoteNic,
 	}
 
-	// If we SSH Tunnelling is used then the target port is always 22
+	// If SSH Tunnelling is used then the target port is always 22
 	if conf.SshTunnel != nil {
 		target.Port = 22
 	}
 
 	logger.Debug("starting IAP Tunnel Manager", "remote port", target.Port)
-	tm := tunnel.NewTunnelManager(target, nil)
+	tunnelManager := tunnel.NewTunnelManager(target, nil)
 
 	go func() {
-		logger.Debug("tm.Serve() starting to wait for connection on port", "port", listener.Addr().(*net.TCPAddr).Port)
-		err := tm.Serve(ctx, listener)
+		logger.Debug("tunnelManager.Serve() starting to wait for connection")
+
+		err := tunnelManager.Serve(ctx, listener)
+
 		if err != nil {
-			logger.Error("tm.Serve() failed", "err", err)
+			logger.Error("tunnelManager.Serve() failed", "err", err)
+
 			return
 		}
-		logger.Debug("tm.Serve() exited normally")
+
+		logger.Debug("tunnelManager.Serve() exited normally")
 	}()
 
-	return tm
+	return tunnelManager
 }

@@ -28,29 +28,37 @@ func (h *Handler) Handle(ctx context.Context) {
 	h.logger.Debug("in HandleClientConnection, created tunnel connection")
 
 	wait.Add(1)
-	go func(ctx context.Context) {
-		defer wait.Done()
-		_, err := io.Copy(h.tunnelConn, h.localConn)
-		if err != nil {
-			//h.errCh <- fmt.Errorf("in HandleClientConnection: failed to copy local connection: %w", err)
-			h.logger.Error("failed to copy local connection", "error", err)
-		}
-		h.logger.Debug("io.Copy local connection completed")
 
-	}(ctx)
+	go func() {
+		defer wait.Done()
+
+		_, err := io.Copy(h.tunnelConn, h.localConn)
+
+		if err != nil {
+			h.logger.Error("failed to copy local connection", "error", err)
+			
+			return
+		}
+
+		h.logger.Debug("io.Copy local connection completed")
+	}()
 
 	wait.Add(1)
-	go func(ctx context.Context) {
+
+	go func() {
 		defer wait.Done()
+
 		_, err := io.Copy(h.localConn, h.tunnelConn)
+
 		if err != nil {
-			//h.errCh <- fmt.Errorf("in HandleClientConnection: failed to copy tunnel connection: %w", err)
 			h.logger.Error("failed to copy tunnel connection", "error", err)
 		}
+
 		h.logger.Debug("io.Copy tunnel connection completed")
-	}(ctx)
+	}()
 
 	wait.Wait()
+
 	_ = h.localConn.Close()
 	_ = h.tunnelConn.Close()
 	h.logger.Debug("Handler exiting")

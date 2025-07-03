@@ -22,16 +22,25 @@ func main() {
 	defer cancel()
 
 	helpPtr := flag.Bool("h", false, "print a usage message")
-	configSectionPtr := flag.String("c", defaultConfigSection, "select a non-default configuration file section")
-	configFilePtr := flag.String("f", defaultConfigFileName, "select a non-default configuration file")
+	configSectionPtr := flag.String(
+		"c",
+		defaultConfigSection,
+		"select a non-default configuration file section",
+	)
+	configFilePtr := flag.String(
+		"f",
+		defaultConfigFileName,
+		"select a non-default configuration file",
+	)
 	verbosePtr := flag.Bool("v", false, "print debugging messages")
 
 	flag.Parse()
 
 	if *helpPtr {
 		flag.Usage()
-		fmt.Println("\nExample configuration file...")
-		fmt.Print(iapgo.ExampleConfig)
+		fmt.Printf("\nExample configuration file...\n")
+		fmt.Printf("%s\n", iapgo.ExampleConfig)
+
 		return
 	}
 
@@ -48,13 +57,11 @@ func main() {
 	cfg, err := iapgo.GetConfig(ctx, *configFilePtr, *configSectionPtr, logger)
 	if err != nil {
 		flag.Usage()
+
 		return
 	}
 
 	logger.Debug("config", "cfgMap[*configSectionPtr]", *cfg)
-
-	// errChh is for reporting errors, must have a buffer of 1 to avoid a deadlock
-	errCh := make(chan error, 10)
 
 	// If SSH tunnelling is being used then localIapPort should be zero.  This means the iapLsnr will
 	// use a random ephemeral port.  If SSH tunnelling is not being used then localIapPort should be set
@@ -68,19 +75,23 @@ func main() {
 	iapLsnr, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", localIapPort))
 	if err != nil {
 		logger.Error("failed to listen (iapLsnr)", "error", err)
+
 		return
 	}
 
 	defer func() {
 		logger.Debug("closing IAP listener")
+
 		_ = iapLsnr.Close()
 	}()
 
 	iapLsnrPort, ok := iapLsnr.Addr().(*net.TCPAddr)
 	if !ok {
 		logger.Error("iapLsnr is not listening on a TCP port")
+
 		return
 	}
+
 	logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort.Port)
 
 	tunnelMgr := iapgo.StartIapTunnel(ctx, iapLsnr, *cfg, logger)
@@ -88,21 +99,32 @@ func main() {
 	select {
 	case <-time.After(1 * time.Second):
 		logger.Warn("timed out waiting for the IAP tunnel to be ready")
+
 		return
 	case err := <-tunnelMgr.Errors():
 		logger.Error("IAP tunnel returned an error", "error", err)
+
 		return
 	case <-tunnelMgr.Ready():
 		logger.Info("IAP tunnel is ready")
+
 		break
 	}
 
 	if cfg.SshTunnel != nil {
-		sshClient, err := iapgo.CreateSshClient(ctx, *cfg, cfg.SshTunnel.AccountName, iapLsnrPort.Port, logger)
+		sshClient, err := iapgo.CreateSshClient(
+			ctx,
+			*cfg,
+			cfg.SshTunnel.AccountName,
+			iapLsnrPort.Port,
+			logger,
+		)
 		if err != nil {
 			logger.Error("failed to start ssh client", "error", err)
+
 			return
 		}
+
 		logger.Debug("CreateSshClient ran okay")
 
 		sshLsnr, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.LocalPort))
@@ -110,12 +132,14 @@ func main() {
 			logger.Error("failed to listen (sshLsnr)", "error", err)
 			return
 		}
+
 		defer func() {
 			logger.Debug("closing SSH listener")
+
 			_ = sshLsnr.Close()
 		}()
 
-		logger.Debug("sshLsnr started", "port", sshLsnr.Addr().(*net.TCPAddr).Port)
+		logger.Debug("sshLsnr started")
 
 		go func() {
 			err := <-tunnelMgr.Errors()
@@ -124,15 +148,25 @@ func main() {
 
 		if len(cfg.Exec) == 0 {
 			logger.Info("no Exec command so enter Control-C to exit")
+
 			for {
-				tunnelConn, err := iapgo.StartSshTunnel(ctx, sshClient, cfg.SshTunnel.TunnelTo, cfg.RemotePort)
+				tunnelConn, err := iapgo.StartSshTunnel(
+					ctx,
+					sshClient,
+					cfg.SshTunnel.TunnelTo,
+					cfg.RemotePort,
+				)
 				if err != nil {
 					logger.Error("failed to start ssh tunnel", "error", err)
 				}
 
 				localConn, err := sshLsnr.Accept()
 				if err != nil {
-					logger.Error("failed to accept local connection or listener closed", "error", err)
+					logger.Error(
+						"failed to accept local connection or listener closed",
+						"error",
+						err,
+					)
 					return
 				}
 
@@ -143,17 +177,24 @@ func main() {
 				tunnelConn, err := iapgo.StartSshTunnel(ctx, sshClient, cfg.SshTunnel.TunnelTo, cfg.RemotePort)
 				if err != nil {
 					logger.Error("failed to start ssh tunnel", "error", err)
+					return
 				}
 
 				localConn, err := sshLsnr.Accept()
 				if err != nil {
-					logger.Error("failed to accept local connection or listener closed", "error", err)
+					logger.Error("local listener closed", "error", err)
 					return
 				}
+
 				go iapgo.NewHandler(localConn, tunnelConn, logger).Handle(ctx)
 			}()
 		}
 	}
 
-	iapgo.RunCmd(ctx, cfg.Exec, cfg.LocalPort, logger, errCh)
+	if cfg.Exec == nil {
+		logger.Debug("no Exec command so wait forever.  Enter Control-C to exit")
+		<-ctx.Done()
+	}
+
+	iapgo.RunCmd(ctx, cfg.Exec, cfg.LocalPort, logger)
 }
