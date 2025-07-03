@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func StartSshTunnel(
+func DialSshTunnel(
 	ctx context.Context,
 	client *ssh.Client,
 	destAddr string,
@@ -79,4 +79,77 @@ func CreateSshClient(
 	}
 
 	return client, nil
+}
+
+func StartSshTunnel(
+	ctx context.Context,
+	cfg *Config,
+	iapLsnrPort int,
+	sshLsnrPort int,
+	logger *slog.Logger,
+) (net.Listener, error) {
+	sshClient, err := CreateSshClient(
+		ctx,
+		*cfg,
+		cfg.SshTunnel.AccountName,
+		iapLsnrPort,
+		logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start ssh client: %w", err)
+	}
+
+	logger.Debug("CreateSshClient ran okay")
+
+	sshLsnr, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.LocalPort))
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen (sshLsnr): %w", err)
+	}
+
+	sshLsnrPort, err = GetPortFromTcpAddr(sshLsnr, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get port from SSH listener: %w", err)
+	}
+
+	logger.Debug("sshLsnrAddrr is listening on TCP port", "port", sshLsnrPort)
+
+	if len(cfg.Exec) == 0 {
+		logger.Info("no Exec command so enter Control-C to exit")
+
+		for {
+			tunnelConn, err := DialSshTunnel(
+				ctx,
+				sshClient,
+				cfg.SshTunnel.TunnelTo,
+				cfg.RemotePort,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to start ssh tunnel: %w")
+			}
+
+			localConn, err := sshLsnr.Accept()
+			if err != nil {
+				return nil, fmt.Errorf("failed to accept local connection or listener closed: %w", err)
+			}
+
+			go NewHandler(localConn, tunnelConn, logger).Handle(ctx)
+		}
+	} else {
+		go func() {
+			tunnelConn, err := DialSshTunnel(ctx, sshClient, cfg.SshTunnel.TunnelTo, cfg.RemotePort)
+			if err != nil {
+				logger.Error("failed to start ssh tunnel", "error", err)
+				return
+			}
+
+			localConn, err := sshLsnr.Accept()
+			if err != nil {
+				logger.Error("local listener closed")
+				return
+			}
+
+			go NewHandler(localConn, tunnelConn, logger).Handle(ctx)
+		}()
+	}
+	return sshLsnr, nil
 }
