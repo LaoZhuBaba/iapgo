@@ -182,7 +182,7 @@ func main() {
 
 				localConn, err := sshLsnr.Accept()
 				if err != nil {
-					logger.Error("local listener closed", "error", err)
+					logger.Error("local listener closed")
 					return
 				}
 
