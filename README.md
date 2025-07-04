@@ -7,8 +7,10 @@
 ![Alt Text](https://github.com/LaoZhuBaba/iapgo/blob/v2/iapgo.drawio.png)
 
 Use this tool to create either a simple IAP tunnel to a port on a jump
-box that is reachable via SSH or create a secondary SSH tunnel within the
-IAP tunnel to reach another device that is accessible from the jump box.
+box that allows access from Google's Identity Aware Proxy address range
+(35.235.240.0/20) or create a secondary SSH tunnel within the IAP tunnel
+to reach another  device that is accessible from the jump box.  Google
+IAP can be reached from internal VPC addresses (if allowed by firewalling).
 
 This tool only automates the setup of tunnels that would otherwise be complex
 to configure and maintain.  It is not designed to bypass any security.  IAP
