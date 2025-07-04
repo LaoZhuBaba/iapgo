@@ -14,8 +14,8 @@ IAP can be reached from internal VPC addresses (if allowed by firewalling).
 
 This tool only automates the setup of tunnels that would otherwise be complex
 to configure and maintain.  It is not designed to bypass any security.  IAP
-tunnelling will only be possible if your firewall allows it, but it considered
-more secure than allowing access from random public IP addresses.
+tunnelling will only be possible if your firewall allows it, but it is
+considered to more secure than allowing access from random public IP addresses.
 
 This tool assumes that you have installed the Google Cloud SDK and have
 logged in with sufficient privileges to connect via Identity Aware Proxy.
@@ -35,7 +35,7 @@ the jump host via SSH.  Generally it is recommended to use Google *oslogin* for 
 See: https://cloud.google.com/compute/docs/oslogin.  If you use *oslogin* then *iapgo*
 attempt to work out your SSH account name and setup is generally easier.
 
-You will need to know the name the target GCE instance, what project it
+You will need to know the name of the target GCE instance, what project it
 is in, and the zone to which it is deployed.
 
 You could find this information in Cloud Console or by running:
@@ -62,7 +62,7 @@ is similar to Dockerfile, so read up on that.  I presume that on Windows
 An environment variable called *$IAP_LISTEN_PORT* is automatically set for
 any command run by the *exec* statement.  The value of this variable will
 be the port that the tunnel is listening on, regardless of whether the tunnel
-is simple IAP or SSH with IAP, and regardless of whether the local_port
+is simple IAP or SSH with IAP, and regardless of whether the local port
 has been explicitly set by *local_port* or is an ephemeral port.
 ```
 Usage:
