@@ -11,45 +11,63 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func DialSshTunnel(
-	ctx context.Context,
+func dialSshTunnel(
 	client *ssh.Client,
 	destAddr string,
 	destPort int,
 ) (net.Conn, error) {
 	conn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(destAddr), Port: destPort})
+
 	if err != nil {
 		return conn, fmt.Errorf("error starting ssh tunnel: %w", err)
 	}
+
 	return conn, nil
 }
 
-func CreateSshClient(
-	ctx context.Context,
-	iapCfg Config,
-	posixAccount string,
+type SshTunnel struct {
+	config    *Config
+	destPort  int
+	localPort int
+	logger    *slog.Logger
+	client    *ssh.Client
+	Listener  net.Listener
+}
+
+func NewSshTunnel(
+	config *Config,
 	destPort int,
+	localPort int,
 	logger *slog.Logger,
-) (*ssh.Client, error) {
+) SshTunnel {
+	return SshTunnel{
+		config:    config,
+		destPort:  destPort,
+		localPort: localPort,
+		logger:    logger,
+	}
+}
+
+// This method starts the underlying SSH session. It sets the c.client field
+// so it requires a pointer receiver.
+func (c *SshTunnel) Init(ctx context.Context) error {
 	var pkFile string
 
-	if iapCfg.SshTunnel.PrivateKeyFile == "" {
+	if c.config.SshTunnel.PrivateKeyFile == "" {
 		pkFile = filepath.Join(os.Getenv("HOME"), ".ssh", "google_compute_engine")
-	} else {
-		pkFile = iapCfg.SshTunnel.PrivateKeyFile
 	}
 
-	logger.Debug("private key path", "pkFile", pkFile)
+	c.logger.Debug("private key path", "pkFile", pkFile)
 
 	privateKey, err := os.ReadFile(pkFile)
 	if err != nil {
-		return nil, fmt.Errorf("error reading private key file: %w", err)
+		return fmt.Errorf("error reading private key file: %w", err)
 	}
 
 	// Create the Signer for this private key.
 	signer, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing private key: %w", err)
+		return fmt.Errorf("error parsing private key: %w", err)
 	}
 
 	// This disables normal checking to ensure that the host you are connecting matches the host recorded
@@ -63,7 +81,7 @@ func CreateSshClient(
 			Ciphers:      algorithms.Ciphers,
 			MACs:         algorithms.MACs,
 		},
-		User: posixAccount,
+		User: c.config.SshTunnel.AccountName,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
@@ -71,85 +89,75 @@ func CreateSshClient(
 		HostKeyAlgorithms: algorithms.HostKeys,
 	}
 
-	logger.Debug("starting ssh tunnel", "destPort", destPort)
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", "localhost", destPort), cfg)
+	c.logger.Debug("starting ssh tunnel", "destPort", c.destPort)
+	c.client, err = ssh.Dial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
 
 	if err != nil {
-		return nil, fmt.Errorf("error dialing ssh tunnel: %w", err)
+		return fmt.Errorf("error dialing ssh tunnel: %w", err)
 	}
 
-	return client, nil
+	return nil
 }
 
-func StartSshTunnel(
-	ctx context.Context,
-	cfg *Config,
-	iapLsnrPort int,
-	sshLsnrPort int,
-	logger *slog.Logger,
-) (net.Listener, error) {
-	sshClient, err := CreateSshClient(
-		ctx,
-		*cfg,
-		cfg.SshTunnel.AccountName,
-		iapLsnrPort,
-		logger,
-	)
+func (c *SshTunnel) StartTunnel(ctx context.Context) (err error) {
+	c.Listener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", c.config.LocalPort))
 	if err != nil {
-		return nil, fmt.Errorf("failed to start ssh client: %w", err)
+		return fmt.Errorf("failed to listen (sshLsnr): %w", err)
 	}
 
-	logger.Debug("CreateSshClient ran okay")
-
-	sshLsnr, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", cfg.LocalPort))
+	c.localPort, err = GetPortFromTcpAddr(c.Listener, c.logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen (sshLsnr): %w", err)
+		return fmt.Errorf("failed to get port from SSH listener: %w", err)
 	}
 
-	sshLsnrPort, err = GetPortFromTcpAddr(sshLsnr, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get port from SSH listener: %w", err)
-	}
+	c.logger.Debug("sshLsnr is listening on TCP port", "port", c.localPort)
 
-	logger.Debug("sshLsnrAddrr is listening on TCP port", "port", sshLsnrPort)
-
-	if len(cfg.Exec) == 0 {
-		logger.Info("no Exec command so enter Control-C to exit")
+	if len(c.config.Exec) == 0 {
+		c.logger.Info("no Exec command so enter Control-C to exit")
 
 		for {
-			tunnelConn, err := DialSshTunnel(
-				ctx,
-				sshClient,
-				cfg.SshTunnel.TunnelTo,
-				cfg.RemotePort,
+			tunnelConn, err := dialSshTunnel(
+				c.client,
+				c.config.SshTunnel.TunnelTo,
+				c.config.RemotePort,
 			)
 			if err != nil {
-				return nil, fmt.Errorf("failed to start ssh tunnel: %w")
+				return fmt.Errorf("failed to start ssh tunnel: %w")
 			}
+			c.logger.Debug(
+				"successfully dialled ssh tunnel",
+				"TunnelTo", c.config.SshTunnel.TunnelTo,
+				"remotePort", c.config.RemotePort,
+			)
 
-			localConn, err := sshLsnr.Accept()
+			localConn, err := c.Listener.Accept()
 			if err != nil {
-				return nil, fmt.Errorf("failed to accept local connection or listener closed: %w", err)
+				return fmt.Errorf("failed to accept local connection or listener closed: %w", err)
 			}
 
-			go NewHandler(localConn, tunnelConn, logger).Handle(ctx)
+			go NewHandler(localConn, tunnelConn, c.logger).Handle(ctx)
 		}
 	} else {
 		go func() {
-			tunnelConn, err := DialSshTunnel(ctx, sshClient, cfg.SshTunnel.TunnelTo, cfg.RemotePort)
+			tunnelConn, err := dialSshTunnel(c.client, c.config.SshTunnel.TunnelTo, c.config.RemotePort)
 			if err != nil {
-				logger.Error("failed to start ssh tunnel", "error", err)
+				c.logger.Error("failed to start ssh tunnel", "error", err)
+				return
+			}
+			c.logger.Debug(
+				"successfully dialled ssh tunnel",
+				"TunnelTo", c.config.SshTunnel.TunnelTo,
+				"remotePort", c.config.RemotePort,
+			)
+
+			localConn, err := c.Listener.Accept()
+			if err != nil {
+				c.logger.Error("local listener closed")
 				return
 			}
 
-			localConn, err := sshLsnr.Accept()
-			if err != nil {
-				logger.Error("local listener closed")
-				return
-			}
-
-			go NewHandler(localConn, tunnelConn, logger).Handle(ctx)
+			go NewHandler(localConn, tunnelConn, c.logger).Handle(ctx)
 		}()
 	}
-	return sshLsnr, nil
+	return nil
 }

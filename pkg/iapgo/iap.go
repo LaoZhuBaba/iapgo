@@ -10,7 +10,7 @@ import (
 	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
 )
 
-func StartIapTunnel(ctx context.Context, listener net.Listener,
+func startIapTunnel(ctx context.Context, listener net.Listener,
 	conf Config, logger *slog.Logger,
 ) *tunnel.TunnelManager {
 	target := tunnel.TunnelTarget{
@@ -47,7 +47,7 @@ func StartIapTunnel(ctx context.Context, listener net.Listener,
 }
 
 func StartIapTunnelMgr(ctx context.Context, iapLsnr net.Listener, cfg *Config, logger *slog.Logger) (*tunnel.TunnelManager, error) {
-	tunnelMgr := StartIapTunnel(ctx, iapLsnr, *cfg, logger)
+	tunnelMgr := startIapTunnel(ctx, iapLsnr, *cfg, logger)
 
 	iapLsnrPort, err := GetPortFromTcpAddr(iapLsnr, logger)
 	if err != nil {

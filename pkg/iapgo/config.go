@@ -17,11 +17,11 @@ type Config struct {
 	RemotePort int        `yaml:"remote_port"`
 	LocalPort  int        `yaml:"local_port"`
 	RemoteNic  string     `yaml:"remote_nic"`
-	Exec       []string   `yaml:"exec,omitempty"`
-	SshTunnel  *SshTunnel `yaml:"ssh_tunnel,omitempty"`
+	Exec       []string      `yaml:"exec,omitempty"`
+	SshTunnel  *SshTunnelCfg `yaml:"ssh_tunnel,omitempty"`
 }
 
-type SshTunnel struct {
+type SshTunnelCfg struct {
 	TunnelTo       string `yaml:"tunnel_to"`
 	AccountName    string `yaml:"account_name,omitempty"`
 	PrivateKeyFile string `yaml:"private_key_file,omitempty"`
