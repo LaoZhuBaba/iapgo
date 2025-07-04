@@ -8,7 +8,7 @@
 
 Use this tool to create either a simple IAP tunnel to a port on a jump
 box that is reachable via SSH or create a secondary SSH tunnel within the
-IAP tunnel to reach an host that is reachable from the jump box.
+IAP tunnel to reach another device that is accessible from the jump box.
 
 This tool only automates the setup of tunnels that would otherwise be complex
 to configure and maintain.  It is not designed to bypass any security.  IAP
