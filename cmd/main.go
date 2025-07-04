@@ -97,7 +97,10 @@ func main() {
 
 	logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
 
-	tunnelMgr, err := iapgo.StartIapTunnelMgr(ctx, iapLsnr, cfg, logger)
+	tunnel := iapgo.NewIapTunnel(cfg, iapLsnr, logger)
+
+	err = tunnel.Start(ctx)
+
 	if err != nil {
 		logger.Error("failed to start tunnel manager", "error", err)
 		return
@@ -105,7 +108,12 @@ func main() {
 
 	// Pick up any errors from tunnelMgr and log them.  Not much else we can do.
 	go func() {
-		err := <-tunnelMgr.Errors()
+		ch := tunnel.Errors()
+		if ch == nil {
+			logger.Error("tunnel.Errors channel is nil!!!!!")
+			return
+		}
+		err := <-tunnel.Errors()
 		logger.Error("iap tunnel manager returned an error", "error", err)
 	}()
 
@@ -119,7 +127,7 @@ func main() {
 			return
 		}
 
-		logger.Debug("NewSshTunnel ran okay")
+		logger.Debug("sshTunnel.Init ran okay")
 
 		err = sshTunnel.StartTunnel(ctx)
 
@@ -127,6 +135,9 @@ func main() {
 			logger.Error("failed to start ssh tunnel", "error", err)
 			return
 		}
+
+		logger.Debug("sshTunnel.StartTunnel ran okay")
+
 		defer func() {
 			logger.Debug("closing SSH listener")
 			_ = sshTunnel.Listener.Close()
