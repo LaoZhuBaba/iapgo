@@ -2,7 +2,6 @@ package iapgo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -37,7 +36,7 @@ func getPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 		}
 	}
 
-	return "", errors.New("no primary posix command could be found")
+	return "", ErrPrimaryPosixCmdNotFound
 }
 
 func getGcpLogin() (string, error) {
@@ -45,7 +44,7 @@ func getGcpLogin() (string, error) {
 	out, err := cmd.Output()
 
 	if err != nil {
-		return "", fmt.Errorf("error getting gcp login: %w", err)
+		return "", fmt.Errorf("%w: %w", ErrFailedToGetGcpLogin, err)
 	}
 
 	return strings.TrimSpace(string(out)), nil
@@ -54,7 +53,7 @@ func getGcpLogin() (string, error) {
 func GetPortFromTcpAddr(addr net.Listener, logger *slog.Logger) (int, error) {
 	tcpAddr, ok := addr.Addr().(*net.TCPAddr)
 	if !ok {
-		return 0, fmt.Errorf("not a TCP listener")
+		return 0, ErrNotATcpListener
 	}
 
 	return tcpAddr.Port, nil

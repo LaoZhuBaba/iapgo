@@ -113,6 +113,7 @@ func main() {
 		ch := tunnel.Errors()
 		if ch == nil {
 			logger.Error("tunnel.Errors channel is nil!!!!!")
+
 			return
 		}
 
@@ -126,6 +127,7 @@ func main() {
 		err = sshTunnel.Start(ctx)
 		if err != nil {
 			logger.Error("failed to start ssh tunnel", "error", err)
+
 			return
 		}
 
@@ -143,6 +145,7 @@ func main() {
 	if cfg.Exec == nil {
 		logger.Debug("no Exec command so wait forever.  Enter Control-C to exit")
 		<-ctx.Done()
+
 		return
 	}
 

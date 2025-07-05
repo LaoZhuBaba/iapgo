@@ -2,7 +2,6 @@ package iapgo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -71,33 +70,23 @@ func GetConfig(
 
 	yamlFile, err := os.ReadFile(yamlFileName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read YAML file with error: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrFailedToReadYaml, err)
 	}
 
 	err = yaml.Unmarshal(yamlFile, &cfgMap)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling YAML: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrFailedToUnmarshalYaml, err)
 	}
 
 	cfg, ok := cfgMap[cfgSection]
 
 	if !ok {
-		return nil, fmt.Errorf("config section does not exist: %s", cfgSection)
+		return nil, fmt.Errorf("%w: %s", ErrConfigSectionNotFound, cfgSection)
 	}
 
 	if cfg.SshTunnel != nil {
 		if cfg.SshTunnel.TunnelTo == "" {
-			return nil, errors.New(
-				"if ssh_tunnel is configured then ssh_tunnel_to must have a value",
-			)
-		}
-	}
-
-	if cfg.SshTunnel != nil {
-		if cfg.SshTunnel.TunnelTo == "" {
-			return nil, errors.New(
-				"if ssh_tunnel is configured then ssh_tunnel_to must have a value",
-			)
+			return nil, ErrSshTunnelToNoValue
 		}
 	}
 
