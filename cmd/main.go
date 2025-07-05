@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/LaoZhuBaba/iapgo/v2/pkg/iapgo"
+	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -121,8 +122,9 @@ func main() {
 		logger.Error("iap tunnel manager returned an error", "error", err)
 	}()
 
+	// pass ssh.Dial because we need to pass a fake dialer for testing
 	if cfg.SshTunnel != nil {
-		sshTunnel := iapgo.NewSshTunnel(cfg, iapLsnrPort, sshLsnrPort, logger)
+		sshTunnel := iapgo.NewSshTunnel(cfg, ssh.Dial, iapLsnrPort, sshLsnrPort, logger)
 
 		err = sshTunnel.Start(ctx)
 		if err != nil {
