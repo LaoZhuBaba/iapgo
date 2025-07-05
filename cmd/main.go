@@ -8,7 +8,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/LaoZhuBaba/iapgo/pkg/iapgo"
+	"github.com/LaoZhuBaba/iapgo/v2/pkg/iapgo"
 )
 
 const (
