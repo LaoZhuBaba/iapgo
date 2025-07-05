@@ -1,4 +1,4 @@
-module github.com/LaoZhuBaba/iapgo
+module github.com/LaoZhuBaba/iapgo/v2
 
 go 1.24.2
 

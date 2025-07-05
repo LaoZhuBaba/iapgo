@@ -25,7 +25,7 @@ func NewHandler(localConn net.Conn, tunnelConn net.Conn, logger *slog.Logger) *H
 func (h *Handler) Handle(ctx context.Context) {
 	var wait sync.WaitGroup
 
-	h.logger.Debug("in HandleClientConnection, created tunnel connection")
+	h.logger.Debug("started handling tunnel i/o")
 
 	wait.Add(1)
 
@@ -33,10 +33,9 @@ func (h *Handler) Handle(ctx context.Context) {
 		defer wait.Done()
 
 		_, err := io.Copy(h.tunnelConn, h.localConn)
-
 		if err != nil {
 			h.logger.Error("failed to copy local connection", "error", err)
-			
+
 			return
 		}
 
@@ -49,7 +48,6 @@ func (h *Handler) Handle(ctx context.Context) {
 		defer wait.Done()
 
 		_, err := io.Copy(h.localConn, h.tunnelConn)
-
 		if err != nil {
 			h.logger.Error("failed to copy tunnel connection", "error", err)
 		}

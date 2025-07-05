@@ -13,11 +13,12 @@ import (
 	"cloud.google.com/go/oslogin/apiv1/osloginpb"
 )
 
-func GetPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
+func getPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 	osloginClient, err := oslogin.NewClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error getting oslogin client: %w", err)
 	}
+
 	defer func() {
 		_ = osloginClient.Close()
 	}()
@@ -26,7 +27,6 @@ func GetPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 		ctx,
 		&osloginpb.GetLoginProfileRequest{Name: fmt.Sprintf("users/%s", gcpLogin)},
 	)
-
 	if err != nil {
 		return "", fmt.Errorf("error getting login profile: %w", err)
 	}
@@ -40,7 +40,7 @@ func GetPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 	return "", errors.New("no primary posix command could be found")
 }
 
-func GetGcpLogin() (string, error) {
+func getGcpLogin() (string, error) {
 	cmd := exec.Command("bash", "-c", "gcloud config get account")
 	out, err := cmd.Output()
 
@@ -52,7 +52,6 @@ func GetGcpLogin() (string, error) {
 }
 
 func GetPortFromTcpAddr(addr net.Listener, logger *slog.Logger) (int, error) {
-
 	tcpAddr, ok := addr.Addr().(*net.TCPAddr)
 	if !ok {
 		return 0, fmt.Errorf("not a TCP listener")
