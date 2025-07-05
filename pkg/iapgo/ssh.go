@@ -116,7 +116,7 @@ func (c *SshTunnel) init() (*ssh.Client, error) {
 	sshClient, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
 
 	if err != nil {
-		return nil, fmt.Errorf("error dialing ssh tunnel: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrSshDailFailed, err)
 	}
 
 	return sshClient, nil
