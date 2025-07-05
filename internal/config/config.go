@@ -1,4 +1,4 @@
-package iapgo
+package config
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/LaoZhuBaba/iapgo/v2/internal/const"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -70,30 +72,30 @@ func GetConfig(
 
 	yamlFile, err := os.ReadFile(yamlFileName)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFailedToReadYaml, err)
+		return nil, fmt.Errorf("%w: %w", _const.ErrFailedToReadYaml, err)
 	}
 
 	err = yaml.Unmarshal(yamlFile, &cfgMap)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrFailedToUnmarshalYaml, err)
+		return nil, fmt.Errorf("%w: %w", _const.ErrFailedToUnmarshalYaml, err)
 	}
 
 	cfg, ok := cfgMap[cfgSection]
 
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrConfigSectionNotFound, cfgSection)
+		return nil, fmt.Errorf("%w: %s", _const.ErrConfigSectionNotFound, cfgSection)
 	}
 
 	if cfg.SshTunnel != nil {
 		if cfg.SshTunnel.TunnelTo == "" {
-			return nil, ErrSshTunnelToNoValue
+			return nil, _const.ErrSshTunnelToNoValue
 		}
 	}
 
 	if cfg.SshTunnel != nil && cfg.SshTunnel.AccountName == "" {
 		logger.Debug("no posix account name found in config so attempting to resolve from OS Login")
 
-		login, err := getGcpLogin()
+		login, err := utils.GetGcpLogin()
 		if err != nil {
 			logger.Error("failed to get gcp login", "error", err)
 			logger.Error(
@@ -103,7 +105,7 @@ func GetConfig(
 			return nil, err
 		}
 
-		cfg.SshTunnel.AccountName, err = getPosixLogin(ctx, login)
+		cfg.SshTunnel.AccountName, err = utils.GetPosixLogin(ctx, login)
 		if err != nil {
 			logger.Error("failed to get posix login", "error", err)
 

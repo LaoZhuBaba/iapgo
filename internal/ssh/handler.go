@@ -1,4 +1,4 @@
-package iapgo
+package ssh
 
 import (
 	"context"

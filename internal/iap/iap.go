@@ -1,4 +1,4 @@
-package iapgo
+package iap
 
 import (
 	"context"
@@ -7,17 +7,20 @@ import (
 	"net"
 	"time"
 
+	"github.com/LaoZhuBaba/iapgo/v2/internal/config"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/const"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/utils"
 	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
 )
 
 type IapTunnel struct {
-	config    *Config
+	config    *config.Config
 	listener  net.Listener
 	logger    *slog.Logger
 	tunnelMgr *tunnel.TunnelManager
 }
 
-func NewIapTunnel(config *Config, listener net.Listener, logger *slog.Logger) *IapTunnel {
+func NewIapTunnel(config *config.Config, listener net.Listener, logger *slog.Logger) *IapTunnel {
 	return &IapTunnel{
 		config:   config,
 		logger:   logger,
@@ -36,7 +39,7 @@ func (t *IapTunnel) Errors() <-chan error {
 func (t *IapTunnel) Start(ctx context.Context) error {
 	t.startMgr(ctx)
 
-	iapLsnrPort, err := GetPortFromTcpAddr(t.listener, t.logger)
+	iapLsnrPort, err := utils.GetPortFromTcpAddr(t.listener, t.logger)
 	if err != nil {
 		return fmt.Errorf("failed to get port from IAP listener: %w", err)
 	}
@@ -44,10 +47,10 @@ func (t *IapTunnel) Start(ctx context.Context) error {
 	t.logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
 	select {
 	case <-time.After(1 * time.Second):
-		return ErrTunnelReadyTimeout
+		return _const.ErrTunnelReadyTimeout
 
 	case err := <-t.tunnelMgr.Errors():
-		return fmt.Errorf("%w: %w", ErrTunnelReturnedError, err)
+		return fmt.Errorf("%w: %w", _const.ErrTunnelReturnedError, err)
 
 	case <-t.tunnelMgr.Ready():
 		t.logger.Info("IAP tunnel is ready")

@@ -1,4 +1,4 @@
-package iapgo
+package ssh
 
 import (
 	"context"
@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/LaoZhuBaba/iapgo/v2/internal/config"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/const"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/utils"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -17,7 +20,7 @@ type SshDialer func(network string, addr string, config *ssh.ClientConfig) (*ssh
 
 type SshTunnel struct {
 	mu        sync.Mutex
-	config    *Config
+	config    *config.Config
 	destPort  int
 	localPort int
 	logger    *slog.Logger
@@ -26,7 +29,7 @@ type SshTunnel struct {
 }
 
 func NewSshTunnel(
-	config *Config,
+	config *config.Config,
 	sshDial SshDialer,
 	destPort int,
 	localPort int,
@@ -61,7 +64,7 @@ func (c *SshTunnel) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to listen (sshLsnr): %w", err)
 	}
 
-	c.localPort, err = GetPortFromTcpAddr(c.Listener, c.logger)
+	c.localPort, err = utils.GetPortFromTcpAddr(c.Listener, c.logger)
 	if err != nil {
 		return fmt.Errorf("failed to get port from SSH listener: %w", err)
 	}
@@ -121,7 +124,7 @@ func (c *SshTunnel) init() (*ssh.Client, error) {
 	sshClient, err := c.sshDial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrSshDailFailed, err)
+		return nil, fmt.Errorf("%w: %w", _const.ErrSshDailFailed, err)
 	}
 
 	return sshClient, nil
