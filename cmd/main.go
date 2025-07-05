@@ -128,6 +128,8 @@ func main() {
 			return
 		}
 
+		sshLsnrPort = sshTunnel.GetLsnrPort()
+
 		logger.Debug("sshTunnel.Start ran okay")
 
 		defer func() {
@@ -147,6 +149,6 @@ func main() {
 	} else {
 		portForRunCmd = sshLsnrPort
 	}
-
 	iapgo.RunCmd(ctx, cfg.Exec, portForRunCmd, logger)
+
 }

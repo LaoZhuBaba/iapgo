@@ -2,11 +2,13 @@ package iapgo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -26,6 +28,7 @@ func dialSshTunnel(
 }
 
 type SshTunnel struct {
+	mu        sync.Mutex
 	config    *Config
 	destPort  int
 	localPort int
@@ -50,8 +53,11 @@ func NewSshTunnel(
 
 // This method starts the underlying SSH session. It sets the c.client field
 // so it requires a pointer receiver.
-func (c *SshTunnel) init(ctx context.Context) error {
+func (c *SshTunnel) init() error {
 	var pkFile string
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if c.config.SshTunnel.PrivateKeyFile == "" {
 		pkFile = filepath.Join(os.Getenv("HOME"), ".ssh", "google_compute_engine")
@@ -99,9 +105,48 @@ func (c *SshTunnel) init(ctx context.Context) error {
 	return nil
 }
 
+func (c *SshTunnel) loop(ctx context.Context) {
+	for {
+		localConn, err := c.Listener.Accept()
+		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				c.logger.Debug("listener closed", "err", err)
+				return
+			}
+			c.logger.Error("error on SSH listener", "err", err)
+			return
+		}
+
+		c.logger.Debug("SSH tunnel listener accepted a connection", "localPort", c.localPort)
+
+		tunnelConn, err := dialSshTunnel(
+			c.client,
+			c.config.SshTunnel.TunnelTo,
+			c.config.RemotePort,
+		)
+		if err != nil {
+			c.logger.Error("error dialing ssh tunnel", "err", err)
+			return
+		}
+		c.logger.Debug(
+			"successfully dialled ssh tunnel",
+			"TunnelTo", c.config.SshTunnel.TunnelTo,
+			"remotePort", c.config.RemotePort,
+		)
+
+		go NewHandler(localConn, tunnelConn, c.logger).Handle(ctx)
+	}
+}
+
+func (c *SshTunnel) GetLsnrPort() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.localPort
+}
+
 func (c *SshTunnel) Start(ctx context.Context) (err error) {
 
-	err = c.init(ctx)
+	err = c.init()
 
 	if err != nil {
 		c.logger.Error("failed to connect to SSH server via IAP", "server", c.config.Instance, "error", err)
@@ -122,54 +167,6 @@ func (c *SshTunnel) Start(ctx context.Context) (err error) {
 
 	c.logger.Debug("sshLsnr is listening on TCP port", "port", c.localPort)
 
-	if len(c.config.Exec) == 0 {
-		c.logger.Info("no Exec command so enter Control-C to exit")
-
-		for {
-			tunnelConn, err := dialSshTunnel(
-				c.client,
-				c.config.SshTunnel.TunnelTo,
-				c.config.RemotePort,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to start ssh tunnel: %w")
-			}
-			c.logger.Debug(
-				"successfully dialled ssh tunnel",
-				"TunnelTo", c.config.SshTunnel.TunnelTo,
-				"remotePort", c.config.RemotePort,
-			)
-
-			localConn, err := c.Listener.Accept()
-			if err != nil {
-				return fmt.Errorf("failed to accept local connection or listener closed: %w", err)
-			}
-
-			c.logger.Debug("SSH tunnel listener accepted a connection", "localPort", c.localPort)
-
-			go NewHandler(localConn, tunnelConn, c.logger).Handle(ctx)
-		}
-	} else {
-		go func() {
-			tunnelConn, err := dialSshTunnel(c.client, c.config.SshTunnel.TunnelTo, c.config.RemotePort)
-			if err != nil {
-				c.logger.Error("failed to start ssh tunnel", "error", err)
-				return
-			}
-			c.logger.Debug(
-				"successfully dialled ssh tunnel",
-				"TunnelTo", c.config.SshTunnel.TunnelTo,
-				"remotePort", c.config.RemotePort,
-			)
-
-			localConn, err := c.Listener.Accept()
-			if err != nil {
-				c.logger.Error("local listener closed")
-				return
-			}
-
-			go NewHandler(localConn, tunnelConn, c.logger).Handle(ctx)
-		}()
-	}
+	go c.loop(ctx)
 	return nil
 }
