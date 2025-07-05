@@ -11,17 +11,17 @@ import (
 )
 
 type Config struct {
-	ProjectID  string     `yaml:"project_id"`
-	Zone       string     `yaml:"zone"`
-	Instance   string     `yaml:"instance"`
-	RemotePort int        `yaml:"remote_port"`
-	LocalPort  int        `yaml:"local_port"`
-	RemoteNic  string     `yaml:"remote_nic"`
-	Exec       []string   `yaml:"exec,omitempty"`
-	SshTunnel  *SshTunnel `yaml:"ssh_tunnel,omitempty"`
+	ProjectID  string        `yaml:"project_id"`
+	Zone       string        `yaml:"zone"`
+	Instance   string        `yaml:"instance"`
+	RemotePort int           `yaml:"remote_port"`
+	LocalPort  int           `yaml:"local_port"`
+	RemoteNic  string        `yaml:"remote_nic"`
+	Exec       []string      `yaml:"exec,omitempty"`
+	SshTunnel  *SshTunnelCfg `yaml:"ssh_tunnel,omitempty"`
 }
 
-type SshTunnel struct {
+type SshTunnelCfg struct {
 	TunnelTo       string `yaml:"tunnel_to"`
 	AccountName    string `yaml:"account_name,omitempty"`
 	PrivateKeyFile string `yaml:"private_key_file,omitempty"`
@@ -87,21 +87,24 @@ func GetConfig(
 
 	if cfg.SshTunnel != nil {
 		if cfg.SshTunnel.TunnelTo == "" {
-			return nil, errors.New("if ssh_tunnel is configured then ssh_tunnel_to must have a value")
+			return nil, errors.New(
+				"if ssh_tunnel is configured then ssh_tunnel_to must have a value",
+			)
 		}
 	}
 
 	if cfg.SshTunnel != nil {
 		if cfg.SshTunnel.TunnelTo == "" {
-			return nil, errors.New("if ssh_tunnel is configured then ssh_tunnel_to must have a value")
+			return nil, errors.New(
+				"if ssh_tunnel is configured then ssh_tunnel_to must have a value",
+			)
 		}
 	}
 
 	if cfg.SshTunnel != nil && cfg.SshTunnel.AccountName == "" {
 		logger.Debug("no posix account name found in config so attempting to resolve from OS Login")
 
-		login, err := GetGcpLogin()
-
+		login, err := getGcpLogin()
 		if err != nil {
 			logger.Error("failed to get gcp login", "error", err)
 			logger.Error(
@@ -111,7 +114,7 @@ func GetConfig(
 			return nil, err
 		}
 
-		cfg.SshTunnel.AccountName, err = GetPosixLogin(ctx, login)
+		cfg.SshTunnel.AccountName, err = getPosixLogin(ctx, login)
 		if err != nil {
 			logger.Error("failed to get posix login", "error", err)
 
