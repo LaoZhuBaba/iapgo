@@ -13,7 +13,7 @@ import (
 	"cloud.google.com/go/oslogin/apiv1/osloginpb"
 )
 
-func GetPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
+func getPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 	osloginClient, err := oslogin.NewClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error getting oslogin client: %w", err)
@@ -40,7 +40,7 @@ func GetPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 	return "", errors.New("no primary posix command could be found")
 }
 
-func GetGcpLogin() (string, error) {
+func getGcpLogin() (string, error) {
 	cmd := exec.Command("bash", "-c", "gcloud config get account")
 	out, err := cmd.Output()
 

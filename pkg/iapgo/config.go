@@ -11,12 +11,12 @@ import (
 )
 
 type Config struct {
-	ProjectID  string     `yaml:"project_id"`
-	Zone       string     `yaml:"zone"`
-	Instance   string     `yaml:"instance"`
-	RemotePort int        `yaml:"remote_port"`
-	LocalPort  int        `yaml:"local_port"`
-	RemoteNic  string     `yaml:"remote_nic"`
+	ProjectID  string        `yaml:"project_id"`
+	Zone       string        `yaml:"zone"`
+	Instance   string        `yaml:"instance"`
+	RemotePort int           `yaml:"remote_port"`
+	LocalPort  int           `yaml:"local_port"`
+	RemoteNic  string        `yaml:"remote_nic"`
 	Exec       []string      `yaml:"exec,omitempty"`
 	SshTunnel  *SshTunnelCfg `yaml:"ssh_tunnel,omitempty"`
 }
@@ -100,7 +100,7 @@ func GetConfig(
 	if cfg.SshTunnel != nil && cfg.SshTunnel.AccountName == "" {
 		logger.Debug("no posix account name found in config so attempting to resolve from OS Login")
 
-		login, err := GetGcpLogin()
+		login, err := getGcpLogin()
 
 		if err != nil {
 			logger.Error("failed to get gcp login", "error", err)
@@ -111,7 +111,7 @@ func GetConfig(
 			return nil, err
 		}
 
-		cfg.SshTunnel.AccountName, err = GetPosixLogin(ctx, login)
+		cfg.SshTunnel.AccountName, err = getPosixLogin(ctx, login)
 		if err != nil {
 			logger.Error("failed to get posix login", "error", err)
 

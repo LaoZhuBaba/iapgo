@@ -50,7 +50,7 @@ func NewSshTunnel(
 
 // This method starts the underlying SSH session. It sets the c.client field
 // so it requires a pointer receiver.
-func (c *SshTunnel) Init(ctx context.Context) error {
+func (c *SshTunnel) init(ctx context.Context) error {
 	var pkFile string
 
 	if c.config.SshTunnel.PrivateKeyFile == "" {
@@ -99,7 +99,17 @@ func (c *SshTunnel) Init(ctx context.Context) error {
 	return nil
 }
 
-func (c *SshTunnel) StartTunnel(ctx context.Context) (err error) {
+func (c *SshTunnel) Start(ctx context.Context) (err error) {
+
+	err = c.init(ctx)
+
+	if err != nil {
+		c.logger.Error("failed to connect to SSH server via IAP", "server", c.config.Instance, "error", err)
+		return
+	}
+
+	c.logger.Debug("underlying SSH session started okay")
+
 	c.Listener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", c.config.LocalPort))
 	if err != nil {
 		return fmt.Errorf("failed to listen (sshLsnr): %w", err)
@@ -134,6 +144,8 @@ func (c *SshTunnel) StartTunnel(ctx context.Context) (err error) {
 			if err != nil {
 				return fmt.Errorf("failed to accept local connection or listener closed: %w", err)
 			}
+
+			c.logger.Debug("SSH tunnel listener accepted a connection", "localPort", c.localPort)
 
 			go NewHandler(localConn, tunnelConn, c.logger).Handle(ctx)
 		}

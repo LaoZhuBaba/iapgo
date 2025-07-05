@@ -120,23 +120,15 @@ func main() {
 	if cfg.SshTunnel != nil {
 
 		sshTunnel := iapgo.NewSshTunnel(cfg, iapLsnrPort, sshLsnrPort, logger)
-		err := sshTunnel.Init(ctx)
 
-		if err != nil {
-			logger.Error("failed to initialise the SSH tunnel", "error", err)
-			return
-		}
-
-		logger.Debug("sshTunnel.Init ran okay")
-
-		err = sshTunnel.StartTunnel(ctx)
+		err = sshTunnel.Start(ctx)
 
 		if err != nil {
 			logger.Error("failed to start ssh tunnel", "error", err)
 			return
 		}
 
-		logger.Debug("sshTunnel.StartTunnel ran okay")
+		logger.Debug("sshTunnel.Start ran okay")
 
 		defer func() {
 			logger.Debug("closing SSH listener")
