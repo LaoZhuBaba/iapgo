@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/LaoZhuBaba/iapgo/v2/internal/config"
-	"github.com/LaoZhuBaba/iapgo/v2/internal/const"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/utils"
 	"golang.org/x/crypto/ssh"
 )
@@ -124,7 +124,7 @@ func (c *SshTunnel) init() (*ssh.Client, error) {
 	sshClient, err := c.sshDial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", _const.ErrSshDailFailed, err)
+		return nil, fmt.Errorf("%w: %w", constants.ErrSshDailFailed, err)
 	}
 
 	return sshClient, nil

@@ -10,7 +10,7 @@ import (
 
 	oslogin "cloud.google.com/go/oslogin/apiv1"
 	"cloud.google.com/go/oslogin/apiv1/osloginpb"
-	"github.com/LaoZhuBaba/iapgo/v2/internal/const"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
 )
 
 func GetPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
@@ -37,7 +37,7 @@ func GetPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 		}
 	}
 
-	return "", _const.ErrPrimaryPosixCmdNotFound
+	return "", constants.ErrPrimaryPosixCmdNotFound
 }
 
 func GetGcpLogin() (string, error) {
@@ -45,7 +45,7 @@ func GetGcpLogin() (string, error) {
 	out, err := cmd.Output()
 
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", _const.ErrFailedToGetGcpLogin, err)
+		return "", fmt.Errorf("%w: %w", constants.ErrFailedToGetGcpLogin, err)
 	}
 
 	return strings.TrimSpace(string(out)), nil
@@ -54,7 +54,7 @@ func GetGcpLogin() (string, error) {
 func GetPortFromTcpAddr(addr net.Listener, logger *slog.Logger) (int, error) {
 	tcpAddr, ok := addr.Addr().(*net.TCPAddr)
 	if !ok {
-		return 0, _const.ErrNotATcpListener
+		return 0, constants.ErrNotATcpListener
 	}
 
 	return tcpAddr.Port, nil

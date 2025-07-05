@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/LaoZhuBaba/iapgo/v2/internal/config"
-	"github.com/LaoZhuBaba/iapgo/v2/internal/const"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/utils"
 	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
 )
@@ -47,10 +47,10 @@ func (t *IapTunnel) Start(ctx context.Context) error {
 	t.logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
 	select {
 	case <-time.After(1 * time.Second):
-		return _const.ErrTunnelReadyTimeout
+		return constants.ErrTunnelReadyTimeout
 
 	case err := <-t.tunnelMgr.Errors():
-		return fmt.Errorf("%w: %w", _const.ErrTunnelReturnedError, err)
+		return fmt.Errorf("%w: %w", constants.ErrTunnelReturnedError, err)
 
 	case <-t.tunnelMgr.Ready():
 		t.logger.Info("IAP tunnel is ready")
