@@ -13,27 +13,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func dialSshTunnel(
-	client *ssh.Client,
-	destAddr string,
-	destPort int,
-) (net.Conn, error) {
-	conn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(destAddr), Port: destPort})
-
-	if err != nil {
-		return conn, fmt.Errorf("error starting ssh tunnel: %w", err)
-	}
-
-	return conn, nil
-}
-
 type SshTunnel struct {
 	mu        sync.Mutex
 	config    *Config
 	destPort  int
 	localPort int
 	logger    *slog.Logger
-	client    *ssh.Client
 	Listener  net.Listener
 }
 
@@ -51,9 +36,41 @@ func NewSshTunnel(
 	}
 }
 
+func (c *SshTunnel) GetLsnrPort() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.localPort
+}
+
+func (c *SshTunnel) Start(ctx context.Context) error {
+	sshClient, err := c.init()
+	if err != nil {
+		return fmt.Errorf("failed to connect to SSH server %s via IAP: %w", c.config.Instance, err)
+	}
+
+	c.logger.Debug("underlying SSH session started okay")
+
+	c.Listener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", c.config.LocalPort))
+	if err != nil {
+		return fmt.Errorf("failed to listen (sshLsnr): %w", err)
+	}
+
+	c.localPort, err = GetPortFromTcpAddr(c.Listener, c.logger)
+	if err != nil {
+		return fmt.Errorf("failed to get port from SSH listener: %w", err)
+	}
+
+	c.logger.Debug("sshLsnr is listening on TCP port", "port", c.localPort)
+
+	go c.loop(ctx, sshClient)
+
+	return nil
+}
+
 // This method starts the underlying SSH session. It sets the c.client field
 // so it requires a pointer receiver.
-func (c *SshTunnel) init() error {
+func (c *SshTunnel) init() (*ssh.Client, error) {
 	var pkFile string
 
 	c.mu.Lock()
@@ -67,13 +84,13 @@ func (c *SshTunnel) init() error {
 
 	privateKey, err := os.ReadFile(pkFile)
 	if err != nil {
-		return fmt.Errorf("error reading private key file: %w", err)
+		return nil, fmt.Errorf("error reading private key file: %w", err)
 	}
 
 	// Create the Signer for this private key.
 	signer, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
-		return fmt.Errorf("error parsing private key: %w", err)
+		return nil, fmt.Errorf("error parsing private key: %w", err)
 	}
 
 	// This disables normal checking to ensure that the host you are connecting matches the host recorded
@@ -96,38 +113,43 @@ func (c *SshTunnel) init() error {
 	}
 
 	c.logger.Debug("starting ssh tunnel", "destPort", c.destPort)
-	c.client, err = ssh.Dial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
+	sshClient, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
 
 	if err != nil {
-		return fmt.Errorf("error dialing ssh tunnel: %w", err)
+		return nil, fmt.Errorf("error dialing ssh tunnel: %w", err)
 	}
 
-	return nil
+	return sshClient, nil
 }
 
-func (c *SshTunnel) loop(ctx context.Context) {
+func (c *SshTunnel) loop(ctx context.Context, client *ssh.Client) {
 	for {
 		localConn, err := c.Listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				c.logger.Debug("listener closed", "err", err)
+
 				return
 			}
+
 			c.logger.Error("error on SSH listener", "err", err)
+
 			return
 		}
 
 		c.logger.Debug("SSH tunnel listener accepted a connection", "localPort", c.localPort)
 
 		tunnelConn, err := dialSshTunnel(
-			c.client,
+			client,
 			c.config.SshTunnel.TunnelTo,
 			c.config.RemotePort,
 		)
 		if err != nil {
 			c.logger.Error("error dialing ssh tunnel", "err", err)
+
 			return
 		}
+
 		c.logger.Debug(
 			"successfully dialled ssh tunnel",
 			"TunnelTo", c.config.SshTunnel.TunnelTo,
@@ -138,35 +160,15 @@ func (c *SshTunnel) loop(ctx context.Context) {
 	}
 }
 
-func (c *SshTunnel) GetLsnrPort() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.localPort
-}
-
-func (c *SshTunnel) Start(ctx context.Context) (err error) {
-
-	err = c.init()
-
+func dialSshTunnel(
+	client *ssh.Client,
+	destAddr string,
+	destPort int,
+) (net.Conn, error) {
+	conn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(destAddr), Port: destPort})
 	if err != nil {
-		c.logger.Error("failed to connect to SSH server via IAP", "server", c.config.Instance, "error", err)
-		return
+		return conn, fmt.Errorf("error starting ssh tunnel: %w", err)
 	}
 
-	c.logger.Debug("underlying SSH session started okay")
-
-	c.Listener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", c.config.LocalPort))
-	if err != nil {
-		return fmt.Errorf("failed to listen (sshLsnr): %w", err)
-	}
-
-	c.localPort, err = GetPortFromTcpAddr(c.Listener, c.logger)
-	if err != nil {
-		return fmt.Errorf("failed to get port from SSH listener: %w", err)
-	}
-
-	c.logger.Debug("sshLsnr is listening on TCP port", "port", c.localPort)
-
-	go c.loop(ctx)
-	return nil
+	return conn, nil
 }

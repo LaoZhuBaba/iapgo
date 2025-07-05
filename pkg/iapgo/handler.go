@@ -33,7 +33,6 @@ func (h *Handler) Handle(ctx context.Context) {
 		defer wait.Done()
 
 		_, err := io.Copy(h.tunnelConn, h.localConn)
-
 		if err != nil {
 			h.logger.Error("failed to copy local connection", "error", err)
 
@@ -49,7 +48,6 @@ func (h *Handler) Handle(ctx context.Context) {
 		defer wait.Done()
 
 		_, err := io.Copy(h.localConn, h.tunnelConn)
-
 		if err != nil {
 			h.logger.Error("failed to copy tunnel connection", "error", err)
 		}

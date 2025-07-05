@@ -87,13 +87,17 @@ func GetConfig(
 
 	if cfg.SshTunnel != nil {
 		if cfg.SshTunnel.TunnelTo == "" {
-			return nil, errors.New("if ssh_tunnel is configured then ssh_tunnel_to must have a value")
+			return nil, errors.New(
+				"if ssh_tunnel is configured then ssh_tunnel_to must have a value",
+			)
 		}
 	}
 
 	if cfg.SshTunnel != nil {
 		if cfg.SshTunnel.TunnelTo == "" {
-			return nil, errors.New("if ssh_tunnel is configured then ssh_tunnel_to must have a value")
+			return nil, errors.New(
+				"if ssh_tunnel is configured then ssh_tunnel_to must have a value",
+			)
 		}
 	}
 
@@ -101,7 +105,6 @@ func GetConfig(
 		logger.Debug("no posix account name found in config so attempting to resolve from OS Login")
 
 		login, err := getGcpLogin()
-
 		if err != nil {
 			logger.Error("failed to get gcp login", "error", err)
 			logger.Error(

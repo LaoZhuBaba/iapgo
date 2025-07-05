@@ -18,6 +18,7 @@ func getPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error getting oslogin client: %w", err)
 	}
+
 	defer func() {
 		_ = osloginClient.Close()
 	}()
@@ -26,7 +27,6 @@ func getPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 		ctx,
 		&osloginpb.GetLoginProfileRequest{Name: fmt.Sprintf("users/%s", gcpLogin)},
 	)
-
 	if err != nil {
 		return "", fmt.Errorf("error getting login profile: %w", err)
 	}
@@ -52,7 +52,6 @@ func getGcpLogin() (string, error) {
 }
 
 func GetPortFromTcpAddr(addr net.Listener, logger *slog.Logger) (int, error) {
-
 	tcpAddr, ok := addr.Addr().(*net.TCPAddr)
 	if !ok {
 		return 0, fmt.Errorf("not a TCP listener")
