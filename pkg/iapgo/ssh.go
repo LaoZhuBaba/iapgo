@@ -13,6 +13,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+type SshDialer func(network string, addr string, config *ssh.ClientConfig) (*ssh.Client, error)
+
 type SshTunnel struct {
 	mu        sync.Mutex
 	config    *Config
@@ -20,10 +22,12 @@ type SshTunnel struct {
 	localPort int
 	logger    *slog.Logger
 	Listener  net.Listener
+	sshDial   SshDialer
 }
 
 func NewSshTunnel(
 	config *Config,
+	sshDial SshDialer,
 	destPort int,
 	localPort int,
 	logger *slog.Logger,
@@ -33,6 +37,7 @@ func NewSshTunnel(
 		destPort:  destPort,
 		localPort: localPort,
 		logger:    logger,
+		sshDial:   sshDial,
 	}
 }
 
@@ -113,7 +118,7 @@ func (c *SshTunnel) init() (*ssh.Client, error) {
 	}
 
 	c.logger.Debug("starting ssh tunnel", "destPort", c.destPort)
-	sshClient, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
+	sshClient, err := c.sshDial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
 
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSshDailFailed, err)
@@ -139,11 +144,7 @@ func (c *SshTunnel) loop(ctx context.Context, client *ssh.Client) {
 
 		c.logger.Debug("SSH tunnel listener accepted a connection", "localPort", c.localPort)
 
-		tunnelConn, err := dialSshTunnel(
-			client,
-			c.config.SshTunnel.TunnelTo,
-			c.config.RemotePort,
-		)
+		tunnelConn, err := c.dialSshTunnel(client)
 		if err != nil {
 			c.logger.Error("error dialing ssh tunnel", "err", err)
 
@@ -160,12 +161,10 @@ func (c *SshTunnel) loop(ctx context.Context, client *ssh.Client) {
 	}
 }
 
-func dialSshTunnel(
+func (c *SshTunnel) dialSshTunnel(
 	client *ssh.Client,
-	destAddr string,
-	destPort int,
 ) (net.Conn, error) {
-	conn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(destAddr), Port: destPort})
+	conn, err := client.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(c.config.SshTunnel.TunnelTo), Port: c.config.RemotePort})
 	if err != nil {
 		return conn, fmt.Errorf("error starting ssh tunnel: %w", err)
 	}
