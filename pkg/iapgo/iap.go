@@ -44,10 +44,10 @@ func (t *IapTunnel) Start(ctx context.Context) error {
 	t.logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
 	select {
 	case <-time.After(1 * time.Second):
-		return fmt.Errorf("timed out waiting for the IAP tunnel to be ready")
+		return ErrTunnelReadyTimeout
 
 	case err := <-t.tunnelMgr.Errors():
-		return fmt.Errorf("IAP tunnel returned an error: %w", err)
+		return fmt.Errorf("%w: %w", ErrTunnelReturnedError, err)
 
 	case <-t.tunnelMgr.Ready():
 		t.logger.Info("IAP tunnel is ready")
