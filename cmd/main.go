@@ -2,13 +2,23 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 
+<<<<<<< Updated upstream
 	"github.com/LaoZhuBaba/iapgo/v2/pkg/iapgo"
+=======
+	"github.com/LaoZhuBaba/iapgo/v2/internal/config"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/exec"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/iap"
+	ssh2 "github.com/LaoZhuBaba/iapgo/v2/internal/ssh"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/utils"
+>>>>>>> Stashed changes
 	"golang.org/x/crypto/ssh"
 )
 
@@ -17,10 +27,13 @@ const (
 	defaultConfigSection  = "default"
 )
 
-func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+type args struct {
+	configFile    string
+	configSection string
+	verbose       bool
+}
 
+func getArgs() *args {
 	helpPtr := flag.Bool("h", false, "print a usage message")
 	configSectionPtr := flag.String(
 		"c",
@@ -41,6 +54,22 @@ func main() {
 		fmt.Printf("\nExample configuration file...\n")
 		fmt.Printf("%s\n", iapgo.ExampleConfig)
 
+		return nil
+	}
+	return &args{
+		configFile:    *configFilePtr,
+		configSection: *configSectionPtr,
+		verbose:       *verbosePtr,
+	}
+}
+
+func main() {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	defer cancel(nil)
+
+	args := getArgs()
+	if args == nil {
+		// This means that the -h flag was passed.
 		return
 	}
 
@@ -50,13 +79,18 @@ func main() {
 	}))
 	slog.SetDefault(logger)
 
-	if *verbosePtr {
+	if args.verbose {
 		logLevel.Set(slog.LevelDebug)
 	}
 
+<<<<<<< Updated upstream
 	cfg, err := iapgo.GetConfig(ctx, *configFilePtr, *configSectionPtr, logger)
+=======
+	cfg, err := config.GetConfig(ctx, args.configFile, args.configSection, logger)
+
+>>>>>>> Stashed changes
 	if err != nil {
-		flag.Usage()
+		logger.Debug("failed to load configuration", "error", err)
 
 		return
 	}
@@ -69,7 +103,7 @@ func main() {
 	var localIapPort int
 
 	// Because the listener port we get from the config may be zero we need to check the actual
-	// value that RunCmd() uses to set the $IAPGO_LISTEN_POR environment variable.  Also the port
+	// value that RunCmd() uses to set the $IAPGO_LISTEN_POR environment variable.  Also, the port
 	// that RunCmd needs may be the IAP listener port or the SSH listener port, depending on config.
 	var sshLsnrPort, portForRunCmd int
 
@@ -109,20 +143,27 @@ func main() {
 		return
 	}
 
-	// Pick up any errors from tunnelMgr and log them.  Not much else we can do.
+	// Pick up any errors from tunnelMgr, log these and cancel the context.
 	go func() {
 		ch := tunnel.Errors()
 		if ch == nil {
 			logger.Error("tunnel.Errors channel is nil!!!!!")
+			cancel(constants.ErrChannelIsNil)
 
 			return
 		}
 
 		err := <-tunnel.Errors()
 		logger.Error("iap tunnel manager returned an error", "error", err)
+<<<<<<< Updated upstream
+=======
+		cancel(err)
+
+		return
+>>>>>>> Stashed changes
 	}()
 
-	// pass ssh.Dial because we need to pass a fake dialer for testing
+	// pass ssh.Dial so we can test with a fake dialer
 	if cfg.SshTunnel != nil {
 		sshTunnel := iapgo.NewSshTunnel(cfg, ssh.Dial, iapLsnrPort, sshLsnrPort, logger)
 
@@ -145,9 +186,11 @@ func main() {
 	}
 
 	if cfg.Exec == nil {
-		logger.Debug("no Exec command so wait forever.  Enter Control-C to exit")
+		logger.Debug("no Exec command so wait forever.  Enter Control-C to exit.")
 		<-ctx.Done()
-
+		if errors.Is(ctx.Err(), context.Canceled) {
+			logger.Error("context canceled with error", "error", context.Cause(ctx))
+		}
 		return
 	}
 
@@ -157,5 +200,17 @@ func main() {
 		portForRunCmd = sshLsnrPort
 	}
 
+<<<<<<< Updated upstream
 	iapgo.RunCmd(ctx, cfg.Exec, portForRunCmd, logger)
+=======
+	exec.RunCmd(ctx, cfg.Exec, portForRunCmd, logger)
+
+	if !cfg.TerminateAfterExec {
+		logger.Debug("terminate_after_exec is not set so wait forever.  Enter Control-C to exit.")
+		<-ctx.Done()
+		if errors.Is(ctx.Err(), context.Canceled) {
+			logger.Error("context canceled with error", "error", context.Cause(ctx))
+		}
+	}
+>>>>>>> Stashed changes
 }

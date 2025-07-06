@@ -10,14 +10,15 @@ import (
 )
 
 type Config struct {
-	ProjectID  string        `yaml:"project_id"`
-	Zone       string        `yaml:"zone"`
-	Instance   string        `yaml:"instance"`
-	RemotePort int           `yaml:"remote_port"`
-	LocalPort  int           `yaml:"local_port"`
-	RemoteNic  string        `yaml:"remote_nic"`
-	Exec       []string      `yaml:"exec,omitempty"`
-	SshTunnel  *SshTunnelCfg `yaml:"ssh_tunnel,omitempty"`
+	ProjectID          string        `yaml:"project_id"`
+	Zone               string        `yaml:"zone"`
+	Instance           string        `yaml:"instance"`
+	RemotePort         int           `yaml:"remote_port"`
+	LocalPort          int           `yaml:"local_port"`
+	RemoteNic          string        `yaml:"remote_nic"`
+	Exec               []string      `yaml:"exec,omitempty"`
+	TerminateAfterExec bool          `yaml:"terminate_after_exec"`
+	SshTunnel          *SshTunnelCfg `yaml:"ssh_tunnel,omitempty"`
 }
 
 type SshTunnelCfg struct {
@@ -37,6 +38,7 @@ default:
   # local_port: 1234
   remote_port: 80
   remote_nic: nic0
+  terminate_after_exec: true
   exec:
     - bash
     - "-c"

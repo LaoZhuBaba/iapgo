@@ -36,7 +36,11 @@ func getPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 		}
 	}
 
+<<<<<<< Updated upstream:pkg/iapgo/util.go
 	return "", ErrPrimaryPosixCmdNotFound
+=======
+	return "", constants.ErrPrimaryPosixAcNotFound
+>>>>>>> Stashed changes:internal/utils/util.go
 }
 
 func getGcpLogin() (string, error) {

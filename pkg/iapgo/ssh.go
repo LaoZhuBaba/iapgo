@@ -51,19 +51,19 @@ func (c *SshTunnel) GetLsnrPort() int {
 func (c *SshTunnel) Start(ctx context.Context) error {
 	sshClient, err := c.init()
 	if err != nil {
-		return fmt.Errorf("failed to connect to SSH server %s via IAP: %w", c.config.Instance, err)
+		return fmt.Errorf("%w: %w", constants.ErrSshDialFailed, err)
 	}
 
 	c.logger.Debug("underlying SSH session started okay")
 
 	c.Listener, err = net.Listen("tcp", fmt.Sprintf("localhost:%d", c.config.LocalPort))
 	if err != nil {
-		return fmt.Errorf("failed to listen (sshLsnr): %w", err)
+		return fmt.Errorf("%w (sshLsnr): %w", constants.ErrFailedToListen, err)
 	}
 
 	c.localPort, err = GetPortFromTcpAddr(c.Listener, c.logger)
 	if err != nil {
-		return fmt.Errorf("failed to get port from SSH listener: %w", err)
+		return fmt.Errorf("%w: %w", constants.ErrFailedToGetPort, err)
 	}
 
 	c.logger.Debug("sshLsnr is listening on TCP port", "port", c.localPort)
@@ -83,19 +83,21 @@ func (c *SshTunnel) init() (*ssh.Client, error) {
 
 	if c.config.SshTunnel.PrivateKeyFile == "" {
 		pkFile = filepath.Join(os.Getenv("HOME"), ".ssh", "google_compute_engine")
+	} else {
+		pkFile = c.config.SshTunnel.PrivateKeyFile
 	}
 
 	c.logger.Debug("private key path", "pkFile", pkFile)
 
 	privateKey, err := os.ReadFile(pkFile)
 	if err != nil {
-		return nil, fmt.Errorf("error reading private key file: %w", err)
+		return nil, fmt.Errorf("%w: %w", constants.ErrPrivateKeyFileNotFound, err)
 	}
 
 	// Create the Signer for this private key.
 	signer, err := ssh.ParsePrivateKey(privateKey)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing private key: %w", err)
+		return nil, fmt.Errorf("%w: %w", constants.ErrInvalidPrivateKeyFile, err)
 	}
 
 	// This disables normal checking to ensure that the host you are connecting matches the host recorded
@@ -118,13 +120,17 @@ func (c *SshTunnel) init() (*ssh.Client, error) {
 	}
 
 	c.logger.Debug("starting ssh tunnel", "destPort", c.destPort)
-	sshClient, err := c.sshDial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
 
+<<<<<<< Updated upstream:pkg/iapgo/ssh.go
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSshDailFailed, err)
 	}
 
 	return sshClient, nil
+=======
+	// Any error from sshDial() is hendled in the calling function.
+	return c.sshDial("tcp", fmt.Sprintf("%s:%d", "localhost", c.destPort), cfg)
+>>>>>>> Stashed changes:internal/ssh/ssh.go
 }
 
 func (c *SshTunnel) loop(ctx context.Context, client *ssh.Client) {
