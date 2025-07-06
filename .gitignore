@@ -33,3 +33,5 @@ go.work.sum
 iapgo.yaml
 .golangci.yaml
 /executables
+/tf_demo/terraform.*
+/tf_demo/.terraform
