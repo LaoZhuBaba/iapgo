@@ -1,0 +1,14 @@
+section1:
+  project_id: project_id
+  zone: zone
+  instance: instance
+  local_port: 100
+  remote_port: 200
+  remote_nic: nic0
+section2:
+  project_id: project_id
+  zone: zone
+  instance: instance
+  local_port: 100
+  remote_port: 200
+  remote_nic: nic0
