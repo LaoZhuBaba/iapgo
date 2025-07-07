@@ -1,4 +1,4 @@
-package iapgo
+package constants
 
 import "errors"
 

@@ -9,16 +9,12 @@ import (
 	"net"
 	"os"
 
-<<<<<<< Updated upstream
-	"github.com/LaoZhuBaba/iapgo/v2/pkg/iapgo"
-=======
 	"github.com/LaoZhuBaba/iapgo/v2/internal/config"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/exec"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/iap"
 	ssh2 "github.com/LaoZhuBaba/iapgo/v2/internal/ssh"
-	"github.com/LaoZhuBaba/iapgo/v2/internal/utils"
->>>>>>> Stashed changes
+	"github.com/LaoZhuBaba/iapgo/v2/internal/util"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -52,7 +48,7 @@ func getArgs() *args {
 	if *helpPtr {
 		flag.Usage()
 		fmt.Printf("\nExample configuration file...\n")
-		fmt.Printf("%s\n", iapgo.ExampleConfig)
+		fmt.Printf("%s\n", config.ExampleConfig)
 
 		return nil
 	}
@@ -83,12 +79,8 @@ func main() {
 		logLevel.Set(slog.LevelDebug)
 	}
 
-<<<<<<< Updated upstream
-	cfg, err := iapgo.GetConfig(ctx, *configFilePtr, *configSectionPtr, logger)
-=======
 	cfg, err := config.GetConfig(ctx, args.configFile, args.configSection, logger)
 
->>>>>>> Stashed changes
 	if err != nil {
 		logger.Debug("failed to load configuration", "error", err)
 
@@ -125,7 +117,7 @@ func main() {
 		_ = iapLsnr.Close()
 	}()
 
-	iapLsnrPort, err := iapgo.GetPortFromTcpAddr(iapLsnr, logger)
+	iapLsnrPort, err := util.GetPortFromTcpAddr(iapLsnr, logger)
 	if err != nil {
 		logger.Error("failed to get port from IAP listener", "error", err)
 
@@ -134,7 +126,7 @@ func main() {
 
 	logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
 
-	tunnel := iapgo.NewIapTunnel(cfg, iapLsnr, logger)
+	tunnel := iap.NewIapTunnel(cfg, iapLsnr, logger)
 
 	err = tunnel.Start(ctx)
 	if err != nil {
@@ -155,17 +147,14 @@ func main() {
 
 		err := <-tunnel.Errors()
 		logger.Error("iap tunnel manager returned an error", "error", err)
-<<<<<<< Updated upstream
-=======
 		cancel(err)
 
 		return
->>>>>>> Stashed changes
 	}()
 
 	// pass ssh.Dial so we can test with a fake dialer
 	if cfg.SshTunnel != nil {
-		sshTunnel := iapgo.NewSshTunnel(cfg, ssh.Dial, iapLsnrPort, sshLsnrPort, logger)
+		sshTunnel := ssh2.NewSshTunnel(cfg, ssh.Dial, iapLsnrPort, sshLsnrPort, logger)
 
 		err = sshTunnel.Start(ctx)
 		if err != nil {
@@ -200,9 +189,6 @@ func main() {
 		portForRunCmd = sshLsnrPort
 	}
 
-<<<<<<< Updated upstream
-	iapgo.RunCmd(ctx, cfg.Exec, portForRunCmd, logger)
-=======
 	exec.RunCmd(ctx, cfg.Exec, portForRunCmd, logger)
 
 	if !cfg.TerminateAfterExec {
@@ -212,5 +198,4 @@ func main() {
 			logger.Error("context canceled with error", "error", context.Cause(ctx))
 		}
 	}
->>>>>>> Stashed changes
 }
