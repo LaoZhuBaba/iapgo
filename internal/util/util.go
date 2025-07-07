@@ -1,4 +1,4 @@
-package iapgo
+package util
 
 import (
 	"context"
@@ -10,9 +10,10 @@ import (
 
 	oslogin "cloud.google.com/go/oslogin/apiv1"
 	"cloud.google.com/go/oslogin/apiv1/osloginpb"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
 )
 
-func getPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
+func GetPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 	osloginClient, err := oslogin.NewClient(ctx)
 	if err != nil {
 		return "", fmt.Errorf("error getting oslogin client: %w", err)
@@ -36,15 +37,15 @@ func getPosixLogin(ctx context.Context, gcpLogin string) (string, error) {
 		}
 	}
 
-	return "", ErrPrimaryPosixCmdNotFound
+	return "", constants.ErrPrimaryPosixAcNotFound
 }
 
-func getGcpLogin() (string, error) {
+func GetGcpLogin() (string, error) {
 	cmd := exec.Command("bash", "-c", "gcloud config get account")
 	out, err := cmd.Output()
 
 	if err != nil {
-		return "", fmt.Errorf("%w: %w", ErrFailedToGetGcpLogin, err)
+		return "", fmt.Errorf("%w: %w", constants.ErrFailedToGetGcpLogin, err)
 	}
 
 	return strings.TrimSpace(string(out)), nil
@@ -53,7 +54,7 @@ func getGcpLogin() (string, error) {
 func GetPortFromTcpAddr(addr net.Listener, logger *slog.Logger) (int, error) {
 	tcpAddr, ok := addr.Addr().(*net.TCPAddr)
 	if !ok {
-		return 0, ErrNotATcpListener
+		return 0, constants.ErrNotATcpListener
 	}
 
 	return tcpAddr.Port, nil

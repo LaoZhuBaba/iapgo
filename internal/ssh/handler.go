@@ -1,20 +1,19 @@
-package iapgo
+package ssh
 
 import (
 	"context"
 	"io"
 	"log/slog"
-	"net"
 	"sync"
 )
 
 type Handler struct {
 	logger     *slog.Logger
-	localConn  net.Conn
-	tunnelConn net.Conn
+	localConn  io.ReadWriteCloser
+	tunnelConn io.ReadWriteCloser
 }
 
-func NewHandler(localConn net.Conn, tunnelConn net.Conn, logger *slog.Logger) *Handler {
+func NewHandler(localConn io.ReadWriteCloser, tunnelConn io.ReadWriteCloser, logger *slog.Logger) *Handler {
 	return &Handler{
 		logger:     logger,
 		localConn:  localConn,

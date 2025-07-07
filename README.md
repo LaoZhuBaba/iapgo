@@ -103,6 +103,7 @@ example:
     # account_name: my_ssh_login
     # By default ~/.ssh/google_compute_engine will be used.
     # private_key_file: /home/fred/.ssh/google_compute_engine
+  terminate_after_exec: true
   exec:
     - bash
     - "-c"
