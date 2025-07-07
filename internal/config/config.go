@@ -72,12 +72,15 @@ func GetConfig(
 ) (*Config, error) {
 	var cfgMap map[string]Config
 
-	yamlFile, err := os.ReadFile(yamlFileName)
+	yamlFile, err := os.Open(yamlFileName)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", constants.ErrFailedToReadYaml, err)
 	}
 
-	err = yaml.Unmarshal(yamlFile, &cfgMap)
+	decoder := yaml.NewDecoder(yamlFile)
+	decoder.KnownFields(true) // This means that any unknown fields will cause decode to fail.
+
+	err = decoder.Decode(&cfgMap)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", constants.ErrFailedToUnmarshalYaml, err)
 	}

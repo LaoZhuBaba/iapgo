@@ -43,12 +43,21 @@ func TestGetConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "GetConfig_unknown_field",
+			args: args{
+				ctx:    context.Background(),
+				logger: slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})),
+			},
+			wantErr: constants.ErrFailedToUnmarshalYaml,
+			want:    nil,
+		},
+		{
 			name: "GetConfig_empty_config_file",
 			args: args{
 				ctx:    context.Background(),
 				logger: slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})),
 			},
-			wantErr: constants.ErrConfigSectionNotFound,
+			wantErr: constants.ErrFailedToUnmarshalYaml,
 			want:    nil,
 		},
 		{
