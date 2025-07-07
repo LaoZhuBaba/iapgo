@@ -2,8 +2,13 @@ package ssh
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"net"
 	"os"
@@ -21,6 +26,45 @@ func test_sshDialerReturnsErr(s1 string, s2 string, config *ssh.ClientConfig) (*
 
 func test_sshDialerReturnsNoErr(s1 string, s2 string, config *ssh.ClientConfig) (*ssh.Client, error) {
 	return &ssh.Client{}, nil
+}
+
+const privateKeyFilename = "testdata/private.pem"
+
+func TestMain(m *testing.M) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		fmt.Printf("Error generating RSA private key: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Marshal the private key to PKCS#1 DER format
+	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+
+	// Create a PEM block for the private key
+	privateKeyBlock := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	}
+
+	// Create the private key file
+	privateKeyFile, err := os.Create(privateKeyFilename)
+	if err != nil {
+		fmt.Printf("Error creating private.pem: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Encode and write the PEM block to the file
+	err = pem.Encode(privateKeyFile, privateKeyBlock)
+	if err != nil {
+		log.Printf("Error encoding private key to PEM: %v\n", err)
+		os.Exit(1)
+	}
+
+	privateKeyFile.Close()
+
+	exitCode := m.Run()
+	_ = os.Remove(privateKeyFilename)
+	os.Exit(exitCode)
 }
 
 func TestSshTunnel_Start(t *testing.T) {
@@ -121,7 +165,7 @@ func TestSshTunnel_Start(t *testing.T) {
 					SshTunnel: &config.SshTunnelCfg{
 						TunnelTo:       "tunnel-to",
 						AccountName:    "account-name",
-						PrivateKeyFile: "testdata/private_key",
+						PrivateKeyFile: privateKeyFilename,
 					},
 				},
 			},
@@ -148,7 +192,7 @@ func TestSshTunnel_Start(t *testing.T) {
 					SshTunnel: &config.SshTunnelCfg{
 						TunnelTo:       "tunnel-to",
 						AccountName:    "account-name",
-						PrivateKeyFile: "testdata/private_key",
+						PrivateKeyFile: privateKeyFilename,
 					},
 				},
 			},
