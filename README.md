@@ -64,6 +64,27 @@ any command run by the *exec* statement.  The value of this variable will
 be the port that the tunnel is listening on, regardless of whether the tunnel
 is simple IAP or SSH with IAP, and regardless of whether the local port
 has been explicitly set by *local_port* or is an ephemeral port.
+
+### Initial Testing & Troubleshooting
+It is strongly recommended that you first prove connectivity using the Google CLI.
+
+For a basic IAP tunnel the CLI syntax would be something like this:
+```
+gcloud compute start-iap-tunnel INSTANCE_NAME <destination port> \
+    --local-host-port=localhost:<local_port_number> \
+    --zone=ZONE
+```
+
+For SSH tunnelling over IAP the syntax would be something like this:
+
+```
+gcloud compute ssh <GCE instance name> --zone=<zone> --tunnel-through-iap -- \
+  -N --L 127.0.0.1:<local port number>:<destination IP>:<destination port>
+```
+If you can't start a tunnel using the CLI then there is no point trying to use *iagpo*.
+
+Once CLI connectivity is proven to work then you can configure and run *iapgo*:
+
 ```
 Usage:
 iapgo [-c config_section] [-f config_file_name] [-v]
@@ -95,7 +116,7 @@ example:
   project_id: my-gcp-project
   zone: us-central1-a
   instance: my-jumpbox
-  remote_port: 80 # When ssh_tunnel is used then this is the port on the tunnel_to hosts
+  remote_port: 80 # When ssh_tunnel is used then this is the port on the tunnel_to host
   remote_nic: nic0
   ssh_tunnel:
     tunnel_to: 1.2.3.4 # This is a host that is reachable from my-jumpbox
