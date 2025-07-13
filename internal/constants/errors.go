@@ -18,4 +18,5 @@ var (
 	ErrFailedToGetPort        = errors.New("failed to get port")
 	ErrPrivateKeyFileNotFound = errors.New("private key file not found")
 	ErrInvalidPrivateKeyFile  = errors.New("invalid private key file")
+	ErrNilParameter           = errors.New("unexpected nil parameter")
 )

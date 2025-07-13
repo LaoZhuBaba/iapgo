@@ -15,7 +15,6 @@ import (
 	"github.com/LaoZhuBaba/iapgo/v2/internal/iap"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/ssh"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/util"
-	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
 	cryptoSsh "golang.org/x/crypto/ssh"
 )
 
@@ -127,11 +126,16 @@ func main() {
 
 	logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
 
-	tun := iap.NewIapTunnel(cfg, new(tunnel.TunnelManager), iapLsnr, logger)
+	tun, err := iap.NewIapTunnel(cfg, iapLsnr, logger)
+	if err != nil {
+		logger.Error("failed to create an IAP tunnel manager", "error", err)
+
+		return
+	}
 
 	err = tun.Start(ctx)
 	if err != nil {
-		logger.Error("failed to start tunnel manager", "error", err)
+		logger.Error("failed to start IAP tunnel manager", "error", err)
 
 		return
 	}

@@ -52,6 +52,9 @@ func GetGcpLogin() (string, error) {
 }
 
 func GetPortFromTcpAddr(addr net.Listener, logger *slog.Logger) (int, error) {
+	if addr == nil {
+		return 0, constants.ErrNotATcpListener
+	}
 	tcpAddr, ok := addr.Addr().(*net.TCPAddr)
 	if !ok {
 		return 0, constants.ErrNotATcpListener
