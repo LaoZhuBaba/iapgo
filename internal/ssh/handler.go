@@ -1,10 +1,8 @@
 package ssh
 
 import (
-	"context"
 	"io"
 	"log/slog"
-	"sync"
 )
 
 type Handler struct {
@@ -21,42 +19,25 @@ func NewHandler(localConn io.ReadWriteCloser, tunnelConn io.ReadWriteCloser, log
 	}
 }
 
-func (h *Handler) Handle(ctx context.Context) {
-	var wait sync.WaitGroup
-
+func (h *Handler) Handle() (error, error) {
+	localConnCh := make(chan error)
+	tunnelConnCh := make(chan error)
 	h.logger.Debug("started handling tunnel i/o")
-
-	wait.Add(1)
-
 	go func() {
-		defer wait.Done()
-
 		_, err := io.Copy(h.tunnelConn, h.localConn)
-		if err != nil {
-			h.logger.Error("failed to copy local connection", "error", err)
-
-			return
-		}
-
+		localConnCh <- err
 		h.logger.Debug("io.Copy local connection completed")
 	}()
 
-	wait.Add(1)
-
 	go func() {
-		defer wait.Done()
-
 		_, err := io.Copy(h.localConn, h.tunnelConn)
-		if err != nil {
-			h.logger.Error("failed to copy tunnel connection", "error", err)
-		}
-
+		tunnelConnCh <- err
 		h.logger.Debug("io.Copy tunnel connection completed")
 	}()
 
-	wait.Wait()
-
+	localConnErr := <-localConnCh
+	tunnelConnErr := <-tunnelConnCh
 	_ = h.localConn.Close()
 	_ = h.tunnelConn.Close()
-	h.logger.Debug("Handler exiting")
+	return localConnErr, tunnelConnErr
 }

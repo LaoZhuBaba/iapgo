@@ -158,7 +158,10 @@ func (c *SshTunnel) loop(ctx context.Context, client *ssh.Client) {
 			"remotePort", c.config.RemotePort,
 		)
 
-		go NewHandler(localConn, tunnelConn, c.logger).Handle(ctx)
+		go func() {
+			err1, err2 := NewHandler(localConn, tunnelConn, c.logger).Handle()
+			c.logger.Debug("handler exited", "local conn error", err1, "tunnel conn error", err2)
+		}()
 	}
 }
 
