@@ -7,24 +7,30 @@ import (
 	"net"
 	"time"
 
-	config2 "github.com/LaoZhuBaba/iapgo/v2/internal/config"
+	config "github.com/LaoZhuBaba/iapgo/v2/internal/config"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/util"
 	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
 )
 
+type TunnelServer interface {
+	Serve(ctx context.Context, lis net.Listener) error
+	Errors() <-chan error
+	Ready() <-chan struct{}
+}
 type IapTunnel struct {
-	config    *config2.Config
+	config    *config.Config
 	listener  net.Listener
 	logger    *slog.Logger
-	tunnelMgr *tunnel.TunnelManager
+	tunnelMgr TunnelServer
 }
 
-func NewIapTunnel(config *config2.Config, listener net.Listener, logger *slog.Logger) *IapTunnel {
+func NewIapTunnel(cfg *config.Config, server TunnelServer, listener net.Listener, logger *slog.Logger) *IapTunnel {
 	return &IapTunnel{
-		config:   config,
-		logger:   logger,
-		listener: listener,
+		config:    cfg,
+		logger:    logger,
+		listener:  listener,
+		tunnelMgr: server,
 	}
 }
 
