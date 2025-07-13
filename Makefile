@@ -2,6 +2,8 @@ iapgo:
 	@echo Building executables/iapgo
 	go build -o executables/iapgo cmd/main.go
 
+test:
+	go test -v ./...
 clean:
 	@echo Deleting all files in executables directory
 	rm -f executables/*
