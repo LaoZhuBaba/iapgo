@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	config2 "github.com/LaoZhuBaba/iapgo/v2/internal/config"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/config"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/util"
 	"golang.org/x/crypto/ssh"
@@ -20,7 +20,7 @@ type SshDialer func(network string, addr string, config *ssh.ClientConfig) (*ssh
 
 type SshTunnel struct {
 	mu        sync.Mutex
-	config    *config2.Config
+	config    *config.Config
 	destPort  int
 	localPort int
 	logger    *slog.Logger
@@ -29,7 +29,7 @@ type SshTunnel struct {
 }
 
 func NewSshTunnel(
-	config *config2.Config,
+	config *config.Config,
 	sshDial SshDialer,
 	destPort int,
 	localPort int,

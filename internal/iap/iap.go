@@ -7,25 +7,50 @@ import (
 	"net"
 	"time"
 
-	config2 "github.com/LaoZhuBaba/iapgo/v2/internal/config"
+	config "github.com/LaoZhuBaba/iapgo/v2/internal/config"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/util"
 	tunnel "github.com/davidspek/go-iap-tunnel/pkg"
 )
 
+type TunnelServer interface {
+	Serve(ctx context.Context, lis net.Listener) error
+	Errors() <-chan error
+	Ready() <-chan struct{}
+}
 type IapTunnel struct {
-	config    *config2.Config
+	config    *config.Config
 	listener  net.Listener
 	logger    *slog.Logger
-	tunnelMgr *tunnel.TunnelManager
+	tunnelMgr TunnelServer
 }
 
-func NewIapTunnel(config *config2.Config, listener net.Listener, logger *slog.Logger) *IapTunnel {
-	return &IapTunnel{
-		config:   config,
-		logger:   logger,
-		listener: listener,
+func NewIapTunnel(cfg *config.Config, listener net.Listener, logger *slog.Logger) (*IapTunnel, error) {
+	if cfg == nil || logger == nil || listener == nil {
+		return nil, constants.ErrNilParameter
 	}
+	target := tunnel.TunnelTarget{
+		Project:   cfg.ProjectID,
+		Zone:      cfg.Zone,
+		Instance:  cfg.Instance,
+		Port:      cfg.RemotePort,
+		Interface: cfg.RemoteNic,
+	}
+
+	// If SSH Tunnelling is used then the target port is always 22
+	if cfg.SshTunnel != nil {
+		target.Port = 22
+	}
+
+	logger.Debug("starting IAP Tunnel Manager", "remote port", target.Port)
+
+	tunnelMgr := tunnel.NewTunnelManager(target, nil)
+	return &IapTunnel{
+		config:    cfg,
+		logger:    logger,
+		listener:  listener,
+		tunnelMgr: tunnelMgr,
+	}, nil
 }
 
 func (t *IapTunnel) Errors() <-chan error {
@@ -37,7 +62,7 @@ func (t *IapTunnel) Errors() <-chan error {
 }
 
 func (t *IapTunnel) Start(ctx context.Context) error {
-	t.startMgr(ctx)
+	go t.startMgr(ctx)
 
 	iapLsnrPort, err := util.GetPortFromTcpAddr(t.listener, t.logger)
 	if err != nil {
@@ -45,15 +70,19 @@ func (t *IapTunnel) Start(ctx context.Context) error {
 	}
 
 	t.logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
+
+	errCh := t.tunnelMgr.Errors()
+	readyCh := t.tunnelMgr.Ready()
+
 	select {
 	case <-time.After(1 * time.Second):
 		return constants.ErrTunnelReadyTimeout
 
-	case err := <-t.tunnelMgr.Errors():
+	case err := <-errCh:
 		return fmt.Errorf("%w: %w", constants.ErrTunnelReturnedError, err)
 
-	case <-t.tunnelMgr.Ready():
-		t.logger.Info("IAP tunnel is ready")
+	case ready := <-readyCh:
+		t.logger.Info("IAP tunnel is ready", "ready", ready)
 
 		break
 	}
@@ -62,32 +91,14 @@ func (t *IapTunnel) Start(ctx context.Context) error {
 }
 
 func (t *IapTunnel) startMgr(ctx context.Context) {
-	target := tunnel.TunnelTarget{
-		Project:   t.config.ProjectID,
-		Zone:      t.config.Zone,
-		Instance:  t.config.Instance,
-		Port:      t.config.RemotePort,
-		Interface: t.config.RemoteNic,
+	t.logger.Debug("tunnelManager.Serve() starting to wait for connection")
+
+	err := t.tunnelMgr.Serve(ctx, t.listener)
+	if err != nil {
+		t.logger.Error("tunnelManager.Serve() failed", "err", err)
+
+		return
 	}
 
-	// If SSH Tunnelling is used then the target port is always 22
-	if t.config.SshTunnel != nil {
-		target.Port = 22
-	}
-
-	t.logger.Debug("starting IAP Tunnel Manager", "remote port", target.Port)
-	t.tunnelMgr = tunnel.NewTunnelManager(target, nil)
-
-	go func() {
-		t.logger.Debug("tunnelManager.Serve() starting to wait for connection")
-
-		err := t.tunnelMgr.Serve(ctx, t.listener)
-		if err != nil {
-			t.logger.Error("tunnelManager.Serve() failed", "err", err)
-
-			return
-		}
-
-		t.logger.Debug("tunnelManager.Serve() exited normally")
-	}()
+	t.logger.Debug("tunnelManager.Serve() exited normally")
 }

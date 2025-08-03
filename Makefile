@@ -3,7 +3,7 @@ iapgo:
 	go build -o executables/iapgo cmd/main.go
 
 test:
-	go test -v ./...
+	go test --count=1 --cover ./...
 clean:
 	@echo Deleting all files in executables directory
 	rm -f executables/*

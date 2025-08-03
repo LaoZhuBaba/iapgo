@@ -13,9 +13,9 @@ import (
 	"github.com/LaoZhuBaba/iapgo/v2/internal/constants"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/exec"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/iap"
-	ssh2 "github.com/LaoZhuBaba/iapgo/v2/internal/ssh"
+	"github.com/LaoZhuBaba/iapgo/v2/internal/ssh"
 	"github.com/LaoZhuBaba/iapgo/v2/internal/util"
-	"golang.org/x/crypto/ssh"
+	cryptoSsh "golang.org/x/crypto/ssh"
 )
 
 const (
@@ -126,18 +126,23 @@ func main() {
 
 	logger.Debug("iapLsnr is listening on TCP port", "port", iapLsnrPort)
 
-	tunnel := iap.NewIapTunnel(cfg, iapLsnr, logger)
-
-	err = tunnel.Start(ctx)
+	tun, err := iap.NewIapTunnel(cfg, iapLsnr, logger)
 	if err != nil {
-		logger.Error("failed to start tunnel manager", "error", err)
+		logger.Error("failed to create an IAP tunnel manager", "error", err)
+
+		return
+	}
+
+	err = tun.Start(ctx)
+	if err != nil {
+		logger.Error("failed to start IAP tunnel manager", "error", err)
 
 		return
 	}
 
 	// Pick up any errors from tunnelMgr, log these and cancel the context.
 	go func() {
-		ch := tunnel.Errors()
+		ch := tun.Errors()
 		if ch == nil {
 			logger.Error("tunnel.Errors channel is nil!!!!!")
 			cancel(constants.ErrChannelIsNil)
@@ -145,7 +150,7 @@ func main() {
 			return
 		}
 
-		err := <-tunnel.Errors()
+		err := <-tun.Errors()
 		logger.Error("iap tunnel manager returned an error", "error", err)
 		cancel(err)
 
@@ -154,7 +159,7 @@ func main() {
 
 	// pass ssh.Dial so we can test with a fake dialer
 	if cfg.SshTunnel != nil {
-		sshTunnel := ssh2.NewSshTunnel(cfg, ssh.Dial, iapLsnrPort, sshLsnrPort, logger)
+		sshTunnel := ssh.NewSshTunnel(cfg, cryptoSsh.Dial, iapLsnrPort, sshLsnrPort, logger)
 
 		err = sshTunnel.Start(ctx)
 		if err != nil {

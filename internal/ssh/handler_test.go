@@ -35,7 +35,7 @@ func TestHandler_Handle(t *testing.T) {
 		Level: &logLevel,
 	}))
 	slog.SetDefault(logger)
-	logLevel.Set(slog.LevelDebug)
+	logLevel.Set(slog.LevelInfo)
 
 	type fields struct {
 		logger     *slog.Logger
